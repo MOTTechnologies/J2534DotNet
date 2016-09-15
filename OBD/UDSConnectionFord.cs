@@ -165,10 +165,11 @@ namespace OBD
                 {
                     case 0:
                         if (rxMsgBytes[i] == 0x07) stateMachine = 1;
+                        else if (rxMsgBytes[i] != 0) return false;
                         break;
                     case 1:
                         if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
-                        break;
+                        return false;
                     case 2:
                         if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Reponse.SUCCESS)
                         {
@@ -203,10 +204,9 @@ namespace OBD
                     default:
                         return false;
                 }
-                
             }
             return false;
-    }
+        }
 
 
         /// <summary>
