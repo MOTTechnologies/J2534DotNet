@@ -8,7 +8,7 @@ namespace OBD
 
     public class OBDcmd
     {
-        public enum Mode
+        public enum Mode : byte
         {
             REQUEST_CURRENT_DATA = 0x01,
             REQUEST_FREEZE_FRAME_DATA = 0x02,
@@ -21,10 +21,10 @@ namespace OBD
             REQUEST_PERMANENT_EMISSIONS_DTC = 0x0A
         }
 
-        public enum Reponse
+        public enum Reponse : byte
         {
             SUCCESS = 0x40,
-            NEGATIVE = 0x7F
+            NEGATIVE_RESPONSE = 0x7F
         }
     }
 

@@ -24,10 +24,7 @@ namespace J2534DotNet
             DataSize = (uint)myByteArray.Length;
             fixed (byte* data = Data)
             {
-                for (int i = 0; i < myByteArray.Length; i++)
-                {
-                    *(data + i) = myByteArray[i];
-                }
+                for (int i = 0; i < myByteArray.Length; i++) *(data + i) = myByteArray[i];
             }
         }
 
@@ -36,10 +33,7 @@ namespace J2534DotNet
             var bytes = new byte[DataSize];
             fixed (byte* data = Data)
             {
-                for (int i = 0; i < DataSize; i++)
-                {
-                    bytes[i] = *(data + i);
-                }
+                for (int i = 0; i < DataSize; i++) bytes[i] = *(data + i);
             }
 
             return bytes;

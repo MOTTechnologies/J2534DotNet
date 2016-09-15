@@ -193,18 +193,14 @@ namespace OBD
         /// </summary>
         /// <param name="replyBytes"></param>
         /// <returns></returns>
-        public bool ReadAllMessages(out List<byte[]> replyBytes)
+        public bool ReadAllMessages(out List<PassThruMsg> messages)
         {
-            replyBytes = new List<byte[]>();
-            List<PassThruMsg> messages;
             m_status = m_j2534Interface.ReadAllMessages(m_channelId, 1, 200, out messages);
 
             if( m_status != J2534Err.STATUS_NOERROR) return false;
             if (messages.Count <= 0) return false;
 
-            foreach(var msg in messages) replyBytes.Add(msg.GetBytes());
             return true;
-
         }
 
             //0x18: "readDiagnosticTroubleCodesByStatus"}
@@ -304,10 +300,16 @@ namespace OBD
             return data;
         }
 
-        public bool SendMessage(byte[] txMsgBytes, bool clearRxBuffer = false)
+        public bool SendMessage(byte[] payload, out PassThruMsg txMsg)
         {
-            PassThruMsg txMsg = new PassThruMsg();
+            txMsg = new PassThruMsg();
             int timeout;
+
+            //First 4 bytes are 00 00 07 E8
+            byte []txMsgBytes = new byte[4 + payload.Length];
+            txMsgBytes[2] = 0x07;
+            txMsgBytes[3] = 0x08;
+            Array.Copy(payload, 0, txMsgBytes, 4, payload.Length);
 
             txMsg.ProtocolID = protocolId;
             txMsg.SetBytes(txMsgBytes);
@@ -318,7 +320,7 @@ namespace OBD
             timeout = 50;
 
 
-            if(clearRxBuffer) m_j2534Interface.ClearRxBuffer(m_channelId);
+            m_j2534Interface.ClearRxBuffer(m_channelId);
 
             var numMsgs = 1;
             m_status = m_j2534Interface.PassThruWriteMsgs(m_channelId, txMsg.ToIntPtr(), ref numMsgs, timeout);

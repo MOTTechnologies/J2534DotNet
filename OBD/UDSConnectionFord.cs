@@ -61,54 +61,152 @@ namespace OBD
             throw new NotImplementedException();
         }
 
-        public bool SecurityAccess(byte mode)
+        public bool SecurityAccess(byte subFunction)
         {
-
-            var value = new byte[0];
-
-            byte[] txMsgBytes = { 0, 0, 0x07, 0xE0, 0x27, mode };
-            if (!SendMessage(txMsgBytes, true)) return false;
+            //Send the security request
+            PassThruMsg txMessage;
+            byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction };
+            if (!SendMessage(txMsgBytes, out txMessage)) return false;
 
             //Attempt to read at least 1 message as a reply
-            List<PassThruMsg> messages;
-            m_status = m_j2534Interface.ReadAllMessages(m_channelId, 1, 50 * 4, out messages);
+            List<PassThruMsg> rxMsgs;
+            if (!ReadAllMessages(out rxMsgs)) return false;
 
-            if (messages.Count <= 0)
+            //Find the start of the response and parse it.
+            byte[] payload;
+            UDScmd.Response subFunctionResponse;
+            PassThruMsg seedKeyResponse;
+            int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
+            if (startOfMessageIndex == -1) return false;
+            seedKeyResponse = rxMsgs[startOfMessageIndex];
+
+            //needs to respond with 00 00 07 e8 67 03 xx xx xx
+            //response is 00 00 7F 27 12 if you have just powered on and had VPP during power on but the command is incorrect length (unsupported)
+            //response is 00 00 7F 27 11 if you have no VPP 
+            //response is 00 07 E8 67 mode XX XX XX if success
+            if (!ParseUDSResponse(seedKeyResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload))
             {
+                //Inform the user of the error
+                if(subFunctionResponse == UDScmd.Response.UNKNOWN)
+                {
+                    //no error code supplied, something else went wrong
+                }
+                else
+                {
+                    //We got a sub function error code
+                }
                 return false;
             }
-            var response1 = messages[0].GetBytes();
-            var response2 = messages[1].GetBytes();   //needs to respond with 00 00 07 e8 67 03 xx xx xx
-
-            //response is 7F 27 12 if you have just powered on and had VPP during power on but the command is incorrect length (unsupported)
-            //response is 7F 27 11 if you have no VPP 
-            //response is 00 07 E8 67 mode XX XX XX if success
-
-            if (response2[4] != 0x7F)
+            else
             {
-                //return true;
-                var seedresponse = CalculateResponseFromSeed(0x7E0, mode, response2, 6);
+                if (payload.Length < 3)
+                {
+                    //Incorrect seed response length
+                    return false;
+                }
+                else
+                {
+                    //Calculate the seed response
+                    var seedresponse = CalculateResponseFromSeed(0x7E0, subFunction, payload);
 
-                txMsgBytes = new byte[] { 0, 0, 0x07, 0xE0, 0x27, (byte)(mode + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
-                if (!SendMessage(txMsgBytes, true)) return false;
+                    txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
+                    PassThruMsg txMsg;
+                    if (!SendMessage(txMsgBytes, out txMsg)) return false;
 
+                    //Attempt to read at least 1 message as a reply
+                    if (!ReadAllMessages(out rxMsgs)) return false;
 
-                List<byte[]> rxMsgs;
-                if (!ReadAllMessages(out rxMsgs)) return false;
+                    //Get the response
+                    startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
+                    if (startOfMessageIndex == -1) return false;
 
-                //message 1 is 00 00 07 E8
-                if (rxMsgs.Count < 2) return false;
+                    //needs to be 00 00 07 E8 67 04 (mode+1)  (or 67 02)
+                    if (!ParseUDSResponse(seedKeyResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload))
+                    {
+                        //Inform the user of the error
+                        return false;
+                    }
 
-                //Do something with the data
-                var response3 = rxMsgs[1]; //needs to be 00 00 07 E8 67 04 (mode+1)  (or 67 02)
-                
-                return true;
+                    //We successfully entered the serurity level!
+                    return true;
+
+                }
+            }
+
+        }
+
+        int GetStartOfMessageIndex(List<PassThruMsg> rxMsgs)
+        {
+            for(int i = 0; i < rxMsgs.Count; i++) if (rxMsgs[i].RxStatus == RxStatus.START_OF_MESSAGE) return i;
+            return -1;
+
+        }
+
+        /// <summary>
+        /// Parse the replies checking for a valid response, if we have a valid response extract the payload data
+        /// </summary>
+        /// <param name="rxMsgs"></param>
+        /// <param name="txMode"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        bool ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode, byte txSubFunction, out UDScmd.Response functionResponse, out byte[] payload)
+        {
+            payload = new byte[0];
+            functionResponse = UDScmd.Response.UNKNOWN;
+            bool positiveReponse = false;
+            var rxMsgBytes = rxMsg.GetBytes();
+
+            //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
+            //If we could use some kind of HEX regex this would be a bit neater
+            int stateMachine = 0;
+            for (int i = 0; i < rxMsgBytes.Length; i++)
+            {
+                switch (stateMachine)
+                {
+                    case 0:
+                        if (rxMsgBytes[i] == 0x07) stateMachine = 1;
+                        break;
+                    case 1:
+                        if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
+                        break;
+                    case 2:
+                        if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Reponse.SUCCESS)
+                        {
+                            //Positive response to the requested mode
+                            positiveReponse = true;
+                        }
+                        else if(rxMsgBytes[i] != (byte)OBDcmd.Reponse.NEGATIVE_RESPONSE)
+                        {
+                            //This is an invalid response, give up now
+                            return false;
+                        }
+                        stateMachine = 3;
+                        break;
+                    case 3:
+                        functionResponse = (UDScmd.Response)rxMsgBytes[i];
+                        if (positiveReponse && rxMsgBytes[i] == txSubFunction)
+                        {
+                            //We have a positive response and a positive subfunction code (subfunction is reflected)
+                            int payloadLength = rxMsgBytes.Length - i;
+                            if(payloadLength > 0)
+                            {
+                                payload = new byte[payloadLength];
+                                Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
+                            }
+                            return true;
+                        } else
+                        {
+                            //We had a positive response but a negative subfunction error
+                            //we return the function error code so it can be relayed
+                            return false;
+                        }
+                    default:
+                        return false;
+                }
                 
             }
             return false;
-        }
-
-
+    }
 
 
         /// <summary>
@@ -119,9 +217,9 @@ namespace OBD
         /// <param name="seedbyte2"></param>
         /// <param name="seedbyte3"></param>
         /// <returns></returns>
-        private static int CalculateResponseFromSeed(int device, int mode, byte[] seedbytes, int offset)
+        private static int CalculateResponseFromSeed(int device, int mode, byte[] seedbytes)
         {
-            int seed = (seedbytes[offset] << 16) | (seedbytes[offset + 1] << 8) | seedbytes[offset + 2];
+            int seed = (seedbytes[0] << 16) | (seedbytes[1] << 8) | seedbytes[2];
 
             byte[] secretKey;
             if (mode == 1) if (SecretKeysLevel1.TryGetValue(device, out secretKey)) return GenerateSeedKeyResponse(seed, secretKey);
@@ -163,6 +261,26 @@ namespace OBD
             return key;
         }
 
+        public bool ECUReset(byte[] command)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool ClearDiagnosticInformation(byte[] command)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool RequestDownload()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool RequestUpload()
+        {
+            throw new NotImplementedException();
+        }
+
         private static readonly Dictionary<int, byte[]> SecretKeysLevel1 = new Dictionary<int, byte[]>
         {
             {0x726, new byte[]{0x3F,0x9E,0x78,0xC5,0x96}},
@@ -185,7 +303,7 @@ namespace OBD
 
     public class UDScmd
     {
-        public enum Mode
+        public enum Mode : byte
         {
             DIAGNOSTIC_SESSION_CONTROL = 0x10,
             ECU_RESET = 0x11,
@@ -209,7 +327,7 @@ namespace OBD
             DIAGNOSTIC_COMMAND = 0xB1,
         }
 
-        public enum Response
+        public enum Response : byte
         {
             POSITIVE_RESPONSE = 0X00,
             GENERAL_REJECT = 0X10,
@@ -250,8 +368,9 @@ namespace OBD
             TORQUE_CONVERTER_CLUTCH_LOCKED = 0x91,
             VOLTAGE_TOO_HIGH = 0x92,
             VOLTAGE_TOO_LOW = 0x93,
+            UNKNOWN = 0xFF,
         }
-        public enum DTCStatusByte
+        public enum DTCStatusByte : byte
         {
             TEST_FAILED_THIS_OPERATION_CYCLE = 0x02,
             PENDING_DTC = 0x04,
