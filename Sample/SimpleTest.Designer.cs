@@ -1,6 +1,6 @@
 ﻿namespace Sample
 {
-    partial class Form1
+    partial class SimpleTest
     {
         /// <summary>
         /// Required designer variable.
@@ -35,6 +35,8 @@
             this.cmdReadVin = new System.Windows.Forms.Button();
             this.txtReadVin = new System.Windows.Forms.TextBox();
             this.button1 = new System.Windows.Forms.Button();
+            this.button2 = new System.Windows.Forms.Button();
+            this.checkBoxLogJ2534 = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // cmdDetectDevices
@@ -96,15 +98,40 @@
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(154, 23);
             this.button1.TabIndex = 6;
-            this.button1.Text = "button1";
+            this.button1.Text = "Send Recieve Test";
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.SendReceiveNoErrorChecking);
             // 
-            // Form1
+            // button2
+            // 
+            this.button2.Location = new System.Drawing.Point(13, 275);
+            this.button2.Name = "button2";
+            this.button2.Size = new System.Drawing.Size(155, 23);
+            this.button2.TabIndex = 7;
+            this.button2.Text = "Security Access 0x27";
+            this.button2.UseVisualStyleBackColor = true;
+            this.button2.Click += new System.EventHandler(this.button2_Click);
+            // 
+            // checkBoxLogJ2534
+            // 
+            this.checkBoxLogJ2534.AutoSize = true;
+            this.checkBoxLogJ2534.Checked = true;
+            this.checkBoxLogJ2534.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.checkBoxLogJ2534.Location = new System.Drawing.Point(13, 43);
+            this.checkBoxLogJ2534.Name = "checkBoxLogJ2534";
+            this.checkBoxLogJ2534.Size = new System.Drawing.Size(120, 17);
+            this.checkBoxLogJ2534.TabIndex = 8;
+            this.checkBoxLogJ2534.Text = "Log J2534 API calls";
+            this.checkBoxLogJ2534.UseVisualStyleBackColor = true;
+            this.checkBoxLogJ2534.CheckStateChanged += new System.EventHandler(this.checkBoxLogJ2534_CheckStateChanged);
+            // 
+            // SimpleTest
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(976, 433);
+            this.Controls.Add(this.checkBoxLogJ2534);
+            this.Controls.Add(this.button2);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.txtReadVin);
             this.Controls.Add(this.cmdReadVin);
@@ -112,8 +139,9 @@
             this.Controls.Add(this.cmdReadVoltage);
             this.Controls.Add(this.txtDevices);
             this.Controls.Add(this.cmdDetectDevices);
-            this.Name = "Form1";
+            this.Name = "SimpleTest";
             this.Text = "J2534DotNet Sample";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -128,6 +156,8 @@
         private System.Windows.Forms.Button cmdReadVin;
         private System.Windows.Forms.TextBox txtReadVin;
         private System.Windows.Forms.Button button1;
+        private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.CheckBox checkBoxLogJ2534;
     }
 }
 

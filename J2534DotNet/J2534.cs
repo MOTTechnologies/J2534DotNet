@@ -33,12 +33,28 @@ namespace J2534DotNet
 
         protected J2534Device m_device;
         protected J2534DllWrapper m_wrapper;
-
+        bool _IsLoaded = false;
+        public bool IsLoaded
+        {
+            get
+            {
+                return _IsLoaded;
+            }
+        }
         public bool LoadLibrary(J2534Device device)
         {
-            m_device = device;
-            m_wrapper = new J2534DllWrapper();
-            return m_wrapper.LoadJ2534Library(m_device.FunctionLibrary);
+            try {
+                m_device = device;
+                m_wrapper = new J2534DllWrapper();
+                _IsLoaded = m_wrapper.LoadJ2534Library(m_device.FunctionLibrary);
+                return _IsLoaded;
+            }
+            catch (Exception)
+            {
+                _IsLoaded = false;
+                return _IsLoaded;
+            }
+
         }
 
         public bool FreeLibrary()
@@ -48,7 +64,8 @@ namespace J2534DotNet
 
         public J2534Err PassThruOpen(IntPtr name, ref int deviceId)
         {
-            return (J2534Err)m_wrapper.Open(name, ref deviceId);
+            var result = (J2534Err)m_wrapper.Open(name, ref deviceId);
+            return result;
         }
 
         public J2534Err PassThruClose(int deviceId)
@@ -68,7 +85,14 @@ namespace J2534DotNet
 
         public J2534Err PassThruReadMsgs(int channelId, IntPtr msgs, ref int numMsgs, int timeout)
         {
-            return (J2534Err) m_wrapper.ReadMsgs(channelId, msgs, ref numMsgs, timeout);
+            try
+            {
+                return (J2534Err)m_wrapper.ReadMsgs(channelId, msgs, ref numMsgs, timeout);
+            }
+            catch (Exception) {
+                return J2534Err.ERR_ACCESS_VIOLATION;
+            }
+            
         }
 
         public J2534Err PassThruWriteMsgs(int channelId, IntPtr msgs, ref int numMsgs, int timeout)

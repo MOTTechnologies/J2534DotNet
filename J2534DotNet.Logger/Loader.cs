@@ -20,25 +20,24 @@ namespace J2534DotNet.Logger
             j2534library = new J2534Extended();
 
             var list = J2534Detect.ListDevices();
-            j2534Device = list[3];
-            //j2534Device = list.FirstOrDefault(d => d.Name == Config.Instance.DeviceName);
-            //if (j2534Device == null)
-            //{
-            //    if (list.Count == 1)
-            //    {
-            //        j2534Device = list.Single();
-            //    }
-            //    else
-            //    {
-            //        var sd = new SelectDevice();
-            //        if (sd.ShowDialog() == DialogResult.OK)
-            //        {
-            //            j2534Device = sd.Device;
 
-            //        }
-            //    }
-            //}
+            if (list.Count == 1)
+            {
+                j2534Device = list.Single();
+            }
+            else
+            {
+                var sd = new SelectDevice();
+                if (sd.ShowDialog() == DialogResult.OK)
+                {
+                    j2534Device = sd.Device;
 
+                } else
+                {
+                    return;
+                }
+            }
+            
             j2534library.LoadLibrary(j2534Device);
         }
 

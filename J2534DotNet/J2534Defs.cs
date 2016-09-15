@@ -153,6 +153,7 @@ namespace J2534DotNet
         ERR_NO_FLOW_CONTROL = 0x17,
         ERR_NOT_UNIQUE = 0x18,
         ERR_INVALID_BAUDRATE = 0x19,
-        ERR_INVALID_DEVICE_ID = 0x1A
+        ERR_INVALID_DEVICE_ID = 0x1A,
+        ERR_ACCESS_VIOLATION = 0x1000
     }
 }

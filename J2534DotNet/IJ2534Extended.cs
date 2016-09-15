@@ -19,5 +19,6 @@ namespace J2534DotNet
         J2534Err ClearFunctMsgLookupTable(int channelId);
         J2534Err AddToFunctMsgLookupTable(int channelId);
         J2534Err DeleteFromFunctMsgLookupTable(int channelId);
+        J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, int max = 500);
     }
 }

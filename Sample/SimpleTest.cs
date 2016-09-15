@@ -29,18 +29,24 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Windows.Forms;
 using J2534DotNet;
+using OBD;
 
 namespace Sample
 {
-    using System.Runtime.InteropServices;
-
     using J2534DotNet.Logger;
+    using System.Runtime.InteropServices;
+    using System.Threading;
+    //using J2534DotNet.Logger;
 
-    public partial class Form1 : Form
+    public partial class SimpleTest : Form
     {
-        public Form1()
+        bool connected = false;
+        J2534Extended passThru;
+        UDSConnectionFord comm;
+        public SimpleTest()
         {
             InitializeComponent();
+            passThru = new J2534Extended();
         }
 
         /*
@@ -57,6 +63,7 @@ namespace Sample
                 MessageBox.Show("Could not find any installed J2534 devices.");
                 return;
             }
+
 
             foreach (J2534Device device in availableJ2534Devices)
             {
@@ -87,23 +94,7 @@ namespace Sample
         {
             J2534Extended passThru = new J2534Extended();
 
-            // Find all of the installed J2534 passthru devices
-            List<J2534Device> availableJ2534Devices = J2534Detect.ListDevices();
-
-            J2534Device j2534Device;
-            var sd = new SelectDevice();
-            if (sd.ShowDialog() == DialogResult.OK)
-            {
-                j2534Device = sd.Device;
-            }
-            else
-            {
-                return;
-            }
-
-            // We will always choose the first J2534 device in the list, if there are multiple devices
-            //   installed, you should do something more intelligent.
-            passThru.LoadLibrary(j2534Device);
+            if (!connected) Connect();
 
             // Attempt to open a communication link with the pass thru device
             int deviceId = 0;
@@ -111,7 +102,7 @@ namespace Sample
 
             // Open a new channel configured for ISO15765 (CAN)
             int channelId = 0;
-            passThru.PassThruConnect(deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref channelId);
+            passThru.PassThruConnect(deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765_125000, ref channelId);
 
             // Set up a message filter to watch for response messages
             int filterId = 0;
@@ -183,43 +174,22 @@ namespace Sample
             J2534Extended passThru = new J2534Extended(); ;// = Loader.Lib;
             double voltage = 0;
 
-            // Find all of the installed J2534 passthru devices
-            List<J2534Device> availableJ2534Devices = J2534Detect.ListDevices();
-            if (availableJ2534Devices.Count == 0)
-            {
-                MessageBox.Show("Could not find any installed J2534 devices.");
-                return;
-            }
+            if (!connected) Connect();
 
-            J2534Device j2534Device;
-            var sd = new SelectDevice();
-            if (sd.ShowDialog() == DialogResult.OK)
-            {
-                j2534Device = sd.Device;
-            }
-            else
-            {
-                return;
-            }
-
-            // We will always choose the first J2534 device in the list, if there are multiple devices
-            //   installed, you should do something more intelligent.
-            passThru.LoadLibrary(j2534Device);
-
-            ObdComm comm = new ObdComm(passThru);
+            UDSConnectionFord comm = new UDSConnectionFord(passThru);
             if (!comm.DetectProtocol())
             {
                 MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
-                comm.Disconnect();
+                //Disconnect();
                 return;
             }
             if (!comm.GetBatteryVoltage(ref voltage))
             {
                 MessageBox.Show(String.Format("Error reading voltage.  Error: {0}", comm.GetLastError()));
-                comm.Disconnect();
+                //Disconnect();
                 return;
             }
-            comm.Disconnect();
+            //Disconnect();
 
             // When we are done with the device, we can free the library.
             passThru.FreeLibrary();
@@ -231,52 +201,148 @@ namespace Sample
             J2534Extended passThru = new J2534Extended();
             string vin = "";
 
-            // Find all of the installed J2534 passthru devices
-            List<J2534Device> availableJ2534Devices = J2534Detect.ListDevices();
-            if (availableJ2534Devices.Count == 0)
-            {
-                MessageBox.Show("Could not find any installed J2534 devices.");
-                return;
-            }
+            if (!connected) Connect();
 
-            J2534Device j2534Device;
-            var sd = new SelectDevice();
-            if (sd.ShowDialog() == DialogResult.OK)
-            {
-                j2534Device = sd.Device;
-            }
-            else
-            {
-                return;
-            }
-
-            // We will always choose the first J2534 device in the list, if there are multiple devices
-            //   installed, you should do something more intelligent.
-            passThru.LoadLibrary(j2534Device);
-
-            ObdComm comm = new ObdComm(passThru);
+            UDSConnectionFord comm = new UDSConnectionFord(passThru);
             if (!comm.DetectProtocol())
             {
                 MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
-                comm.Disconnect();
+                //comm.Disconnect();
                 return;
             }
             if (!comm.GetVin(ref vin))
             {
                 MessageBox.Show(String.Format("Error reading VIN.  Error: {0}", comm.GetLastError()));
-                comm.Disconnect();
+                //Disconnect();
                 return;
             }
-            comm.Disconnect();
 
-            // When we are done with the device, we can free the library.
-            passThru.FreeLibrary();
+            //Disconnect();
             txtReadVin.Text = vin;
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
             MessageBox.Show(Assembly.GetExecutingAssembly().Location);
+        }
+
+
+        void Connect()
+        {
+            if (connected)
+            {
+                return;
+            }
+
+            if (!passThru.IsLoaded)
+            {
+                if (!LoadJ2534()) return;
+            }
+
+            comm = new UDSConnectionFord(passThru);
+
+            if (!comm.DetectProtocol())
+            {
+                MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
+                connected = false;
+            }
+            else
+            {
+                connected = true;
+            }
+
+            
+        }
+
+        bool LoadJ2534()
+        {
+            J2534Device j2534Device;
+
+            // Find all of the installed J2534 passthru devices
+            List<J2534Device> availableJ2534Devices = J2534Detect.ListDevices();
+            if (availableJ2534Devices.Count == 0)
+            {
+                MessageBox.Show("Could not find any installed J2534 devices.");
+                return false;
+            }
+
+            if (checkBoxLogJ2534.Checked)
+            {
+                j2534Device = new J2534Device();
+                j2534Device.FunctionLibrary = System.IO.Directory.GetCurrentDirectory() + "\\" + "J2534DotNet.Logger.dll";
+                Thread.Sleep(1000);
+                var loaded = passThru.LoadLibrary(j2534Device);
+                return loaded;
+            }
+
+            //If there is only one DLL to choose from then load it
+            if (availableJ2534Devices.Count == 1) passThru.LoadLibrary(availableJ2534Devices[0]);
+            else
+            {
+                var sd = new SelectDevice();
+                if (sd.ShowDialog() == DialogResult.OK)
+                {
+                    j2534Device = sd.Device;
+                    var loaded = passThru.LoadLibrary(j2534Device);
+                    return loaded;
+                }
+            }
+            return false;
+        }
+
+        void Disconnect()
+        {
+            if (!connected) comm.Disconnect();
+            connected = false;
+            passThru.FreeLibrary();
+
+        }
+
+        void UpdateLog(string text)
+        {
+            txtDevices.Text += text + Environment.NewLine;
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            string vin = "";
+
+            if (!connected) Connect();
+
+            UpdateLog("DetectProtocol");
+            if (!comm.DetectProtocol()) return;
+
+            UpdateLog("EnterSecurityMode");
+            if (!comm.SecurityAccess(0x01))
+            {
+                MessageBox.Show(String.Format("Error entering security mode.  Error: {0}", comm.GetLastError()));
+
+                //Disconnect();
+                return;
+            }
+
+            //Download the PCM now
+            byte[] bytes;
+            UpdateLog("ReadMemoryByAddress");
+
+            bool success = comm.ReadMemoryByAddress(0, out bytes);
+
+            //comm.Disconnect();
+
+            // When we are done with the device, we can free the library.
+            //passThru.FreeLibrary();
+            txtReadVin.Text = vin;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+
+            Disconnect();
+        }
+
+        private void checkBoxLogJ2534_CheckStateChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

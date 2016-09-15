@@ -164,6 +164,38 @@ namespace J2534DotNet
             // TODO: fix this
             return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.DELETE_FROM_FUNCT_MSG_LOOKUP_TABLE, input, output);
         }
-        
+
+        /// <summary>
+        /// Poll for messages until we get a timeout
+        /// </summary>
+        /// <param name="numMsgs"></param>
+        /// <param name="timeout"></param>
+        /// <returns></returns>
+        public J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, int max = 500)
+        {
+            messages = new List<PassThruMsg>();
+
+            IntPtr rxMsgs = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(PassThruMsg)) * numMsgs);
+            var m_status = J2534Err.STATUS_NOERROR;
+            var m_status2 = J2534Err.STATUS_NOERROR;
+            int count = 0;
+
+            m_status = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
+
+            //If we didn't get a single reply return the error code
+            if (m_status != J2534Err.STATUS_NOERROR) return m_status;
+
+            m_status2 = m_status;
+            while (J2534Err.STATUS_NOERROR == m_status2)
+            {
+                m_status = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
+                if (m_status2 == J2534Err.STATUS_NOERROR) messages.AddRange(rxMsgs.AsMsgList(numMsgs));
+                count++;
+                if (count > max) break;
+            }
+
+            return J2534Err.STATUS_NOERROR;
+        }
+
     }
 }
