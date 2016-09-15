@@ -300,9 +300,9 @@ namespace OBD
             return data;
         }
 
-        public bool SendMessage(byte[] payload, out PassThruMsg txMsg)
+        public bool SendMessage(byte[] payload)
         {
-            txMsg = new PassThruMsg();
+            var txMsg = new PassThruMsg();
             int timeout;
 
             //First 4 bytes are 00 00 07 E8
@@ -339,7 +339,7 @@ namespace OBD
             if (mode == 0x03 || mode == 0x04) txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, mode };
             else txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, mode, pid };
 
-            if (!SendMessage(txMsgBytes, true)) return false;
+            if (!SendMessage(txMsgBytes)) return false;
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> messages;

@@ -294,7 +294,7 @@ namespace Sample
                 return;
             }  else
             {
-                MessageBox.Show(String.Format("Successfull entered level 1 security mode!");
+                MessageBox.Show("Successfull entered level 1 security mode!");
             }
 
             //Download the PCM now

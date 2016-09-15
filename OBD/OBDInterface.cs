@@ -25,7 +25,7 @@ namespace OBD
         bool GetVin(ref string vin);
         bool GetBatteryVoltage(ref double voltage);
 
-        bool SendMessage(byte [] txMsgBytes, bool clearRxBuffer);
+        bool SendMessage(byte [] txMsgBytes);
 
     }
 

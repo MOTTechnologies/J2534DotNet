@@ -66,7 +66,7 @@ namespace OBD
             //Send the security request
             PassThruMsg txMessage;
             byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction };
-            if (!SendMessage(txMsgBytes, out txMessage)) return false;
+            if (!SendMessage(txMsgBytes)) return false;
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> rxMsgs;
@@ -111,7 +111,7 @@ namespace OBD
 
                     txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
                     PassThruMsg txMsg;
-                    if (!SendMessage(txMsgBytes, out txMsg)) return false;
+                    if (!SendMessage(txMsgBytes)) return false;
 
                     //Attempt to read at least 1 message as a reply
                     if (!ReadAllMessages(out rxMsgs)) return false;
