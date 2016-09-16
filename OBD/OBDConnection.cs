@@ -32,6 +32,8 @@ using J2534DotNet;
 namespace OBD
 {
     using System;
+    using System.ComponentModel;
+    using System.Reflection;
     using System.Runtime.InteropServices;
     using System.Threading;
 
@@ -53,56 +55,56 @@ namespace OBD
         }
 
         
-        public bool GetFaults(ref string[] faults)
+        public string[] GetFaults()
         {
-            byte[] value;
-            if (ReadObdPid(0x03, 0x00, out value))
+            byte[] data;
+
+            ReadObdPid(OBDcmd.Mode.REQUEST_EMISSIONS_DTC, out data);
+            if (data.Length > 0)
             {
-                if (value.Length == 1)
-                {
-                    return true;
-                }
-                //TODO: PARSE DTCs
-                return true;
+                //TODO: PARSE DTCs  
             }
-            return false;
+
+            return new string[0];
+
         }
 
         public bool ClearFaults()
         {
             byte[] value;
-            if (ReadObdPid(0x04, 0x00, out value))
-            {
-                return true;
-            }
+            ReadObdPid(OBDcmd.Mode.CLEAR_EMISSIONS_DTC, out value);
+
+            //TODO
+            //parse response
+
             return false;
         }
 
         // Recursively read the available pids starting from 0x00 and inrementing by 0x20
         public void GetAvailableObdPidsAt(byte start, ref List<byte> availablePids)
         {
-            byte[] value;
-            // start = 0x00, 0x20, 0x40... 
-            if (ReadObdPid(0x01, start, out value))
-            {
-                for (int i = 0; i < value.Length; i++)
-                {
-                    for (int shift = 0; shift < 8; shift++)
-                    {
-                        byte mask = (byte)(0x80 >> shift);
-                        if ((value[i] & mask) != 0)
-                        {
-                            availablePids.Add((byte)((i * 0x8) + shift + 1 + start));
-                        }
-                    }
-                }
+            //byte[] value;
+            //// start = 0x00, 0x20, 0x40... 
+            //if (ReadObdPid(0x01, start, out value))
+            //{
+            //    for (int i = 0; i < value.Length; i++)
+            //    {
+            //        for (int shift = 0; shift < 8; shift++)
+            //        {
+            //            byte mask = (byte)(0x80 >> shift);
+            //            if ((value[i] & mask) != 0)
+            //            {
+            //                availablePids.Add((byte)((i * 0x8) + shift + 1 + start));
+            //            }
+            //        }
+            //    }
 
-                if (availablePids.Contains((byte)(start + 0x20)))
-                {
-                    GetAvailableObdPidsAt((byte)(start + 0x20), ref availablePids);
-                }
-            }
-            return;
+            //    if (availablePids.Contains((byte)(start + 0x20)))
+            //    {
+            //        GetAvailableObdPidsAt((byte)(start + 0x20), ref availablePids);
+            //    }
+            //}
+            //return;
         }
 
         public bool GetAvailableObdPids(ref List<byte> availablePids)
@@ -125,19 +127,14 @@ namespace OBD
             return false;
         }
 
-        public bool GetVin(ref string vin)
+        public string GetVin()
         {
+            string vin = "";
             byte[] value;
-            if (ReadObdPid(0x09, 0x02, out value))
-            {
-                if (value.Length > 0)
-                {
-                    vin = Encoding.ASCII.GetString(value.ToArray());
-                    return true;
-                }
-                return false;
-            }
-            return false;
+            ReadObdPid(OBDcmd.Mode.REQUEST_VEHICLE_INFORMATION, out value, (byte)PID.VehicleInformation.VIN);
+
+            if (value.Length > 0) vin = Encoding.ASCII.GetString(value.ToArray());
+            return vin;
         }
         
         public bool ResetECU()
@@ -266,12 +263,16 @@ namespace OBD
                 }
 	        }
             
-            if(!ReadObdPid(0x01,0x00, out value))
+            //Check we can read some PIDs back
+            ReadObdPid(OBDcmd.Mode.REQUEST_CURRENT_DATA, out value);
+            if(value.Length <= 0)
             {
                 m_status = m_j2534Interface.PassThruDisconnect(m_channelId);
-		        return false;
-	        }
-	        return true;
+                return false;
+            }
+             
+
+            return true;
         }
 
         public bool Disconnect()
@@ -284,21 +285,11 @@ namespace OBD
             return true;
         }
 
-        public J2534Err GetLastError()
+        public string GetLastError()
         {
-            return m_status;
+            return m_status.ToString();
         }
 
-        public byte[] RemoveNullPadding(byte[] bytes)
-        {
-            if (bytes == null) return null;
-            if (bytes.Length <= 0) return null;
-            int i;
-            for (i = 0; i < bytes.Length; i++) if (bytes[i] != 0) break;
-            var data = new byte[bytes.Length - i];
-            for (int j = 0; j < bytes.Length - i; j++) data[j] = bytes[j + i];
-            return data;
-        }
 
         public bool SendMessage(byte[] payload)
         {
@@ -329,56 +320,129 @@ namespace OBD
             return true;
         }
 
-        public bool ReadObdPid(byte mode, byte pid, out byte[] value)
+        public void ReadObdPid(OBDcmd.Mode mode, out byte[] payload, byte pid = 0)
         {
-
+            // See here for more details on this PID mode https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_1_PID_00
             int timeout = 50;
-            value = new byte[0];
+            payload = new byte[0];
             byte[] txMsgBytes;
 
-            if (mode == 0x03 || mode == 0x04) txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, mode };
-            else txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, mode, pid };
+            if ((byte)mode == 0x03 || (byte)mode == 0x04) txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, (byte)mode };
+            else txMsgBytes = new byte[] { 0x00, 0x00, 0x07, 0xdf, (byte)mode, pid };
 
-            if (!SendMessage(txMsgBytes)) return false;
+            //if the message failed to send bubble the error back
+            if (!SendMessage(txMsgBytes)) throw new J2534Exception(m_status);
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> messages;
             m_status = m_j2534Interface.ReadAllMessages(m_channelId, 1, timeout * 4, out messages);
 
-            if (messages.Count <= 0) return false;
-            var response = messages.Last().GetBytes();
+            //bubble the error back to the user
+            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
 
-            if (response == null) return false;
+            int index = GetStartOfMessageIndex(messages);
 
-            // See here for more details on this PID mode https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_1_PID_00
+            //If there is no response throw a timeout exception
+            if(index == -1) throw new J2534Exception(J2534Err.ERR_TIMEOUT);
 
-            //Check we got a successfull response
-            response = RemoveNullPadding(response);
+            //Throw an OBD exception if we got an error
 
-            //Typical tx/rx response
-            //0x07 DF 09 02 (request VIN)
-            //0x07 E8 49 02 01 xx xx xx xx
+            ////Typical tx/rx response
+            ////0x07 DF 09 02 (request VIN)
+            ////0x07 E8 49 02 01 xx xx xx xx
+            if (!ParseOBDResponse(messages[index], mode, out payload, pid)) throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
 
-            //Only accept 0x7E8,0x7E9,0x7E8,0x7EA etc
-            if (response[0] != 0x07) return false;
-            var temp = (response[1] & 0xE0);
-            if (temp != 0xE0) return false;
+            ////Check we got a successfull response
+            //response = RemoveNullPadding(response);
 
-            //Check the response code was valid
-            if (response[2] != 0x40 + mode) return false;
+            ////Only accept 0x7E8,0x7E9,0x7E8,0x7EA etc
+            //if (response[0] != 0x07) return false;
+            //var temp = (response[1] & 0xE0);
+            //if (temp != 0xE0) return false;
 
-            //Check the PID recieved was the one requested
-            if (response[3] != pid) return false;
+            ////Check the response code was valid
+            //if (response[2] != 0x40 + (byte)mode) return false;
 
-            var valueLength = response.Length - 5;
-            if (valueLength <= 0) return false;
+            ////Check the PID recieved was the one requested
+            //if (response[3] != pid) return false;
 
-            value = new byte[response.Length - 5];
+            //var valueLength = response.Length - 5;
+            //if (valueLength <= 0) return false;
 
-            //Remove the response from the reply
-            Array.Copy(response, 5, value, 0, response.Length - 5);
+            //value = new byte[response.Length - 5];
 
-            return true;
+            ////Remove the response from the reply
+            //Array.Copy(response, 5, value, 0, response.Length - 5);
+        }
+
+        /// <summary>
+        /// Parse the replies checking for a valid response, if we have a valid response extract the payload data
+        /// </summary>
+        /// <param name="rxMsgs"></param>
+        /// <param name="txMode"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        bool ParseOBDResponse(PassThruMsg rxMsg, OBDcmd.Mode txMode, out byte[] payload, byte pid = 0)
+        {
+            payload = new byte[0];
+            var rxMsgBytes = rxMsg.GetBytes();
+
+            //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
+            //If we could use some kind of HEX regex this would be a bit neater
+            int stateMachine = 0;
+            for (int i = 0; i < rxMsgBytes.Length; i++)
+            {
+                switch (stateMachine)
+                {
+                    case 0:
+                        if (rxMsgBytes[i] == 0x07) stateMachine = 1;
+                        else if (rxMsgBytes[i] != 0) return false;
+                        break;
+                    case 1:
+                        if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
+                        return false;
+                    case 2:
+                        if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Response.SUCCESS) stateMachine = 3;
+                        else  return false; //This is an invalid response, give up now
+                        break;
+                    case 3:
+                        //We have a positive response
+                        if(pid != 0) //If a PID byte was sent it must be reflected
+                        {
+                            if (rxMsgBytes[i] != pid) return false;
+                            i++; //payloads is after this byte
+                        }
+                        //return the payload if there is any
+                        int payloadLength = rxMsgBytes.Length - i;
+                        if (payloadLength > 0)
+                        {
+                            payload = new byte[payloadLength];
+                            Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
+                        }
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        }
+
+        public int GetStartOfMessageIndex(List<PassThruMsg> rxMsgs)
+        {
+            for (int i = 0; i < rxMsgs.Count; i++) if (rxMsgs[i].RxStatus == RxStatus.START_OF_MESSAGE) return i;
+            return -1;
+
+        }
+
+        public byte[] RemoveNullPadding(byte[] bytes)
+        {
+            if (bytes == null) return null;
+            if (bytes.Length <= 0) return null;
+            int i;
+            for (i = 0; i < bytes.Length; i++) if (bytes[i] != 0) break;
+            var data = new byte[bytes.Length - i];
+            for (int j = 0; j < bytes.Length - i; j++) data[j] = bytes[j + i];
+            return data;
         }
 
     }

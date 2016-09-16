@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace OBD
@@ -135,78 +136,6 @@ namespace OBD
 
         }
 
-        int GetStartOfMessageIndex(List<PassThruMsg> rxMsgs)
-        {
-            for(int i = 0; i < rxMsgs.Count; i++) if (rxMsgs[i].RxStatus == RxStatus.START_OF_MESSAGE) return i;
-            return -1;
-
-        }
-
-        /// <summary>
-        /// Parse the replies checking for a valid response, if we have a valid response extract the payload data
-        /// </summary>
-        /// <param name="rxMsgs"></param>
-        /// <param name="txMode"></param>
-        /// <param name="payload"></param>
-        /// <returns></returns>
-        bool ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode, byte txSubFunction, out UDScmd.Response functionResponse, out byte[] payload)
-        {
-            payload = new byte[0];
-            functionResponse = UDScmd.Response.UNKNOWN;
-            bool positiveReponse = false;
-            var rxMsgBytes = rxMsg.GetBytes();
-
-            //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
-            //If we could use some kind of HEX regex this would be a bit neater
-            int stateMachine = 0;
-            for (int i = 0; i < rxMsgBytes.Length; i++)
-            {
-                switch (stateMachine)
-                {
-                    case 0:
-                        if (rxMsgBytes[i] == 0x07) stateMachine = 1;
-                        else if (rxMsgBytes[i] != 0) return false;
-                        break;
-                    case 1:
-                        if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
-                        return false;
-                    case 2:
-                        if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Reponse.SUCCESS)
-                        {
-                            //Positive response to the requested mode
-                            positiveReponse = true;
-                        }
-                        else if(rxMsgBytes[i] != (byte)OBDcmd.Reponse.NEGATIVE_RESPONSE)
-                        {
-                            //This is an invalid response, give up now
-                            return false;
-                        }
-                        stateMachine = 3;
-                        break;
-                    case 3:
-                        functionResponse = (UDScmd.Response)rxMsgBytes[i];
-                        if (positiveReponse && rxMsgBytes[i] == txSubFunction)
-                        {
-                            //We have a positive response and a positive subfunction code (subfunction is reflected)
-                            int payloadLength = rxMsgBytes.Length - i;
-                            if(payloadLength > 0)
-                            {
-                                payload = new byte[payloadLength];
-                                Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
-                            }
-                            return true;
-                        } else
-                        {
-                            //We had a positive response but a negative subfunction error
-                            //we return the function error code so it can be relayed
-                            return false;
-                        }
-                    default:
-                        return false;
-                }
-            }
-            return false;
-        }
 
 
         /// <summary>
@@ -279,6 +208,73 @@ namespace OBD
         public bool RequestUpload()
         {
             throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Parse the replies checking for a valid response, if we have a valid response extract the payload data
+        /// </summary>
+        /// <param name="rxMsgs"></param>
+        /// <param name="txMode"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        bool ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode, byte txSubFunction, out UDScmd.Response functionResponse, out byte[] payload)
+        {
+            payload = new byte[0];
+            functionResponse = UDScmd.Response.UNKNOWN;
+            bool positiveReponse = false;
+            var rxMsgBytes = rxMsg.GetBytes();
+
+            //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
+            //If we could use some kind of HEX regex this would be a bit neater
+            int stateMachine = 0;
+            for (int i = 0; i < rxMsgBytes.Length; i++)
+            {
+                switch (stateMachine)
+                {
+                    case 0:
+                        if (rxMsgBytes[i] == 0x07) stateMachine = 1;
+                        else if (rxMsgBytes[i] != 0) return false;
+                        break;
+                    case 1:
+                        if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
+                        return false;
+                    case 2:
+                        if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Response.SUCCESS)
+                        {
+                            //Positive response to the requested mode
+                            positiveReponse = true;
+                        }
+                        else if (rxMsgBytes[i] != (byte)OBDcmd.Response.NEGATIVE_RESPONSE)
+                        {
+                            //This is an invalid response, give up now
+                            return false;
+                        }
+                        stateMachine = 3;
+                        break;
+                    case 3:
+                        functionResponse = (UDScmd.Response)rxMsgBytes[i];
+                        if (positiveReponse && rxMsgBytes[i] == txSubFunction)
+                        {
+                            //We have a positive response and a positive subfunction code (subfunction is reflected)
+                            int payloadLength = rxMsgBytes.Length - i;
+                            if (payloadLength > 0)
+                            {
+                                payload = new byte[payloadLength];
+                                Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
+                            }
+                            return true;
+                        }
+                        else
+                        {
+                            //We had a positive response but a negative subfunction error
+                            //we return the function error code so it can be relayed
+                            return false;
+                        }
+                    default:
+                        return false;
+                }
+            }
+            return false;
         }
 
         private static readonly Dictionary<int, byte[]> SecretKeysLevel1 = new Dictionary<int, byte[]>
@@ -381,5 +377,6 @@ namespace OBD
             WARNING_INDICATOR_REQUESTED = 0x80,
 
         }
+
     }
 }

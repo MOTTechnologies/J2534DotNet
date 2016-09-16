@@ -177,20 +177,23 @@ namespace Sample
             if (!connected) Connect();
 
             UDSConnectionFord comm = new UDSConnectionFord(passThru);
-            if (!comm.DetectProtocol())
+            try
             {
-                MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
-                //comm.Disconnect();
-                return;
+                //TODO read battery voltage
+                bool UDSConnection = comm.DetectProtocol();
+                if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+                vin = comm.GetVin();
+
             }
-            if (!comm.GetVin(ref vin))
+            catch (OBDException obdEx)
             {
-                MessageBox.Show(String.Format("Error reading VIN.  Error: {0}", comm.GetLastError()));
-                //Disconnect();
-                return;
+                MessageBox.Show("Error retrieving VIN due to OBD error: " + obdEx.Message);
+            }
+            catch (J2534Exception j2534Ex)
+            {
+                MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
             }
 
-            //Disconnect();
             txtReadVin.Text = vin;
         }
 
@@ -276,7 +279,7 @@ namespace Sample
             txtDevices.Text += text + Environment.NewLine;
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void SecurityLevel1_Click(object sender, EventArgs e)
         {
             string vin = "";
 

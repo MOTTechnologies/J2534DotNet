@@ -14,7 +14,8 @@ namespace OBD
         bool IsConnected();
         bool DetectProtocol();
         bool Disconnect();
-        bool ReadObdPid(byte mode, byte pid, out byte[] value);
+
+        void ReadObdPid(OBDcmd.Mode mode, out byte[] payload, byte pid = 0);
 
         void GetAvailableObdPidsAt(byte start, ref List<byte> availablePids);
 
@@ -22,7 +23,8 @@ namespace OBD
 
         bool ClearFaults();
 
-        bool GetVin(ref string vin);
+        string GetVin();
+
         bool GetBatteryVoltage(ref double voltage);
 
         bool SendMessage(byte [] txMsgBytes);

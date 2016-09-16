@@ -197,5 +197,14 @@ namespace J2534DotNet
             return J2534Err.STATUS_NOERROR;
         }
 
+
+    }
+
+    public class J2534Exception : Exception
+    {
+        public J2534Exception(J2534Err error) : base(error.ToString())
+        {
+
+        }
     }
 }
