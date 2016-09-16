@@ -171,15 +171,13 @@ namespace Sample
 
         private void CmdReadVinClick(object sender, EventArgs e)
         {
-            J2534Extended passThru = new J2534Extended();
             string vin = "";
 
-            if (!connected) Connect();
-
-            UDSConnectionFord comm = new UDSConnectionFord(passThru);
             try
             {
-                //TODO read battery voltage
+                J2534Extended passThru = new J2534Extended();
+                if (!connected) Connect();
+                UDSConnectionFord comm = new UDSConnectionFord(passThru);
                 bool UDSConnection = comm.DetectProtocol();
                 if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
                 vin = comm.GetVin();
@@ -192,6 +190,9 @@ namespace Sample
             catch (J2534Exception j2534Ex)
             {
                 MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+            } catch (Exception ex)
+            {
+                MessageBox.Show("Unknown error occured whilst retrieving VIN: " + ex.Message);
             }
 
             txtReadVin.Text = vin;
@@ -282,22 +283,34 @@ namespace Sample
         private void SecurityLevel1_Click(object sender, EventArgs e)
         {
             string vin = "";
-
-            if (!connected) Connect();
-
-            UpdateLog("DetectProtocol");
-            if (!comm.DetectProtocol()) return;
-
-            UpdateLog("EnterSecurityMode");
-            if (!comm.SecurityAccess(0x01))
+            try
             {
-                MessageBox.Show(String.Format("Error entering security mode.  Error: {0}", comm.GetLastError()));
+                if (!connected) Connect();
 
-                //Disconnect();
-                return;
-            }  else
+                bool UDSConnection = comm.DetectProtocol();
+                if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+
+                if (!comm.SecurityAccess(0x01))
+                {
+                    MessageBox.Show(String.Format("Error entering security mode.  Error: {0}", comm.GetLastError()));
+                }
+                else
+                {
+                    MessageBox.Show("Successfull entered level 1 security mode!");
+                }
+
+            }
+            catch (OBDException obdEx)
             {
-                MessageBox.Show("Successfull entered level 1 security mode!");
+                MessageBox.Show("Error retrieving VIN due to OBD error: " + obdEx.Message);
+            }
+            catch (J2534Exception j2534Ex)
+            {
+                MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unknown error occured whilst retrieving VIN: " + ex.Message);
             }
 
             //Download the PCM now
@@ -310,7 +323,6 @@ namespace Sample
 
             // When we are done with the device, we can free the library.
             //passThru.FreeLibrary();
-            txtReadVin.Text = vin;
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)

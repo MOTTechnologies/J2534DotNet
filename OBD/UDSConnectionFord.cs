@@ -64,6 +64,8 @@ namespace OBD
 
         public bool SecurityAccess(byte subFunction)
         {
+            //TODO handle exceptions
+
             //Send the security request
             PassThruMsg txMessage;
             byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction };
