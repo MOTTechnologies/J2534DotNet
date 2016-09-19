@@ -124,7 +124,7 @@ namespace J2534DotNet
             return (J2534Err)m_wrapper.StopMsgFilter(channelId, filterId);
         }
 
-        public J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, int voltage)
+        public J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, long voltage)
         {
             return (J2534Err)m_wrapper.SetProgrammingVoltage(deviceId, (int)pinNumber, voltage);
         }

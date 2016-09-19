@@ -107,7 +107,7 @@ namespace J2534DotNet
         ISO15765_500000 = 500000
     }
 
-    public enum PinNumber
+    public enum PinNumber : long
     {
         AUX = 0,
         PIN_6 = 6,

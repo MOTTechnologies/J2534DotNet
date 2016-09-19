@@ -65,6 +65,7 @@ namespace OBD
         public bool SecurityAccess(byte subFunction)
         {
             //TODO handle exceptions
+            
 
             //Send the security request
             PassThruMsg txMessage;

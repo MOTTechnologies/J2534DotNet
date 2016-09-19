@@ -40,20 +40,20 @@ namespace Sample
 
             foreach (J2534Device device in availableJ2534Devices)
             {
-                txtDevices.Text += device.Name + ", " + device.Vendor + "\r\n\r\n";
-                txtDevices.Text += "\tConfig Application:\t" + device.ConfigApplication + "\r\n";
-                txtDevices.Text += "\tFunction Library:\t" + device.FunctionLibrary + "\r\n\r\n";
-                txtDevices.Text += "\tProtocol\t\tChannels\r\n";
-                txtDevices.Text += "\tCAN\t\t" + device.CANChannels + "\r\n";
-                txtDevices.Text += "\tISO15765\t" + device.ISO15765Channels + "\r\n";
-                txtDevices.Text += "\tISO14230\t" + device.ISO14230Channels + "\r\n";
-                txtDevices.Text += "\tISO9141\t\t" + device.ISO9141Channels + "\r\n";
-                txtDevices.Text += "\tJ1850PWM\t" + device.J1850PWMChannels + "\r\n";
-                txtDevices.Text += "\tJ1850PWM\t" + device.J1850VPWChannels + "\r\n";
-                txtDevices.Text += "\tSCI_A_ENGINE\t" + device.SCI_A_ENGINEChannels + "\r\n";
-                txtDevices.Text += "\tSCI_A_TRANS\t" + device.SCI_A_TRANSChannels + "\r\n";
-                txtDevices.Text += "\tSCI_B_ENGINE\t" + device.SCI_B_ENGINEChannels + "\r\n";
-                txtDevices.Text += "\tSCI_B_TRANS\t" + device.SCI_B_TRANSChannels + "\r\n\r\n";
+                log.Text += device.Name + ", " + device.Vendor + "\r\n\r\n";
+                log.Text += "\tConfig Application:\t" + device.ConfigApplication + "\r\n";
+                log.Text += "\tFunction Library:\t" + device.FunctionLibrary + "\r\n\r\n";
+                log.Text += "\tProtocol\t\tChannels\r\n";
+                log.Text += "\tCAN\t\t" + device.CANChannels + "\r\n";
+                log.Text += "\tISO15765\t" + device.ISO15765Channels + "\r\n";
+                log.Text += "\tISO14230\t" + device.ISO14230Channels + "\r\n";
+                log.Text += "\tISO9141\t\t" + device.ISO9141Channels + "\r\n";
+                log.Text += "\tJ1850PWM\t" + device.J1850PWMChannels + "\r\n";
+                log.Text += "\tJ1850PWM\t" + device.J1850VPWChannels + "\r\n";
+                log.Text += "\tSCI_A_ENGINE\t" + device.SCI_A_ENGINEChannels + "\r\n";
+                log.Text += "\tSCI_A_TRANS\t" + device.SCI_A_TRANSChannels + "\r\n";
+                log.Text += "\tSCI_B_ENGINE\t" + device.SCI_B_ENGINEChannels + "\r\n";
+                log.Text += "\tSCI_B_TRANS\t" + device.SCI_B_TRANSChannels + "\r\n\r\n";
             }
         }
 
@@ -277,12 +277,11 @@ namespace Sample
 
         void UpdateLog(string text)
         {
-            txtDevices.Text += text + Environment.NewLine;
+            log.Text += text + Environment.NewLine;
         }
 
         private void SecurityLevel1_Click(object sender, EventArgs e)
         {
-            string vin = "";
             try
             {
                 if (!connected) Connect();
@@ -335,5 +334,39 @@ namespace Sample
         {
 
         }
+
+        bool toggle = false;
+        private void setProgrammingVoltage(object sender, EventArgs e)
+        {
+            try
+            {
+                if (toggle)
+                {
+                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, 18000)");
+                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 0xFFFFFFFF);
+                    UpdateLog("Voltage = : " + programmingVoltage);
+                    toggle = false;
+                }
+                else
+                {
+                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, 18000)");
+                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
+                    UpdateLog("Voltage = : " + programmingVoltage);
+                    toggle = true;
+                }
+
+            }
+            catch (J2534Exception j2534Ex)
+            {
+                UpdateLog("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+                MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+            }
+            catch (Exception ex)
+            {
+                UpdateLog("Unknown error occured whilst retrieving VIN: " + ex.Message);
+                MessageBox.Show("Unknown error occured whilst retrieving VIN: " + ex.Message);
+            }
+        }
+
     }
 }

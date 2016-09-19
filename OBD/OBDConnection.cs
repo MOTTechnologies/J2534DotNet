@@ -80,6 +80,23 @@ namespace OBD
             return false;
         }
 
+
+        public float PassThruSetProgrammingVoltage(PinNumber pinNumber, long milliVolts)
+        {
+            if (milliVolts < 5000) milliVolts = 5000;
+            if (milliVolts > 20000 && milliVolts < 0xFFFFFFFE ) milliVolts = 20000;
+
+            m_status = m_j2534Interface.PassThruSetProgrammingVoltage(m_deviceId, pinNumber, milliVolts);
+            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
+
+            Thread.Sleep(10);
+            int mv = 0;
+            m_status = m_j2534Interface.ReadProgrammingVoltage(m_deviceId, ref mv);
+            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
+            float voltage = ((float)mv) / 1000.0f;
+            return voltage;
+        }
+
         // Recursively read the available pids starting from 0x00 and inrementing by 0x20
         public void GetAvailableObdPidsAt(byte start, ref List<byte> availablePids)
         {

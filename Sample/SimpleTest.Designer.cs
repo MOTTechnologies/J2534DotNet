@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             this.cmdDetectDevices = new System.Windows.Forms.Button();
-            this.txtDevices = new System.Windows.Forms.TextBox();
+            this.log = new System.Windows.Forms.TextBox();
             this.cmdReadVoltage = new System.Windows.Forms.Button();
             this.txtVoltage = new System.Windows.Forms.TextBox();
             this.cmdReadVin = new System.Windows.Forms.Button();
@@ -38,6 +38,7 @@
             this.button2 = new System.Windows.Forms.Button();
             this.checkBoxLogJ2534 = new System.Windows.Forms.CheckBox();
             this.button3 = new System.Windows.Forms.Button();
+            this.button4 = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // cmdDetectDevices
@@ -50,14 +51,14 @@
             this.cmdDetectDevices.UseVisualStyleBackColor = true;
             this.cmdDetectDevices.Click += new System.EventHandler(this.CmdDetectDevicesClick);
             // 
-            // txtDevices
+            // log
             // 
-            this.txtDevices.Location = new System.Drawing.Point(173, 15);
-            this.txtDevices.Multiline = true;
-            this.txtDevices.Name = "txtDevices";
-            this.txtDevices.ScrollBars = System.Windows.Forms.ScrollBars.Both;
-            this.txtDevices.Size = new System.Drawing.Size(791, 160);
-            this.txtDevices.TabIndex = 1;
+            this.log.Location = new System.Drawing.Point(173, 15);
+            this.log.Multiline = true;
+            this.log.Name = "log";
+            this.log.ScrollBars = System.Windows.Forms.ScrollBars.Both;
+            this.log.Size = new System.Drawing.Size(791, 160);
+            this.log.TabIndex = 1;
             // 
             // cmdReadVoltage
             // 
@@ -135,11 +136,22 @@
             this.button3.Text = "Security Access Level 2";
             this.button3.UseVisualStyleBackColor = true;
             // 
+            // button4
+            // 
+            this.button4.Location = new System.Drawing.Point(13, 333);
+            this.button4.Name = "button4";
+            this.button4.Size = new System.Drawing.Size(155, 23);
+            this.button4.TabIndex = 10;
+            this.button4.Text = "Toggle Pin 13 18v";
+            this.button4.UseVisualStyleBackColor = true;
+            this.button4.Click += new System.EventHandler(this.setProgrammingVoltage);
+            // 
             // SimpleTest
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(976, 433);
+            this.Controls.Add(this.button4);
             this.Controls.Add(this.button3);
             this.Controls.Add(this.checkBoxLogJ2534);
             this.Controls.Add(this.button2);
@@ -148,7 +160,7 @@
             this.Controls.Add(this.cmdReadVin);
             this.Controls.Add(this.txtVoltage);
             this.Controls.Add(this.cmdReadVoltage);
-            this.Controls.Add(this.txtDevices);
+            this.Controls.Add(this.log);
             this.Controls.Add(this.cmdDetectDevices);
             this.Name = "SimpleTest";
             this.Text = "J2534DotNet Sample";
@@ -161,7 +173,7 @@
         #endregion
 
         private System.Windows.Forms.Button cmdDetectDevices;
-        private System.Windows.Forms.TextBox txtDevices;
+        private System.Windows.Forms.TextBox log;
         private System.Windows.Forms.Button cmdReadVoltage;
         private System.Windows.Forms.TextBox txtVoltage;
         private System.Windows.Forms.Button cmdReadVin;
@@ -170,6 +182,7 @@
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.CheckBox checkBoxLogJ2534;
         private System.Windows.Forms.Button button3;
+        private System.Windows.Forms.Button button4;
     }
 }
 

@@ -67,6 +67,22 @@ namespace J2534DotNet
             return returnValue;
         }
 
+        public J2534Err ReadProgrammingVoltage(int deviceId, ref int voltage)
+        {
+            IntPtr input = IntPtr.Zero;
+            IntPtr output = Marshal.AllocHGlobal(8);
+
+            J2534Err returnValue = (J2534Err)m_wrapper.Ioctl(deviceId, (int)Ioctl.READ_PROG_VOLTAGE, input, output);
+            if (returnValue == J2534Err.STATUS_NOERROR)
+            {
+                voltage = Marshal.ReadInt32(output);
+            }
+
+            Marshal.FreeHGlobal(output);
+
+            return returnValue;
+        }
+
         public J2534Err FiveBaudInit(int channelId, byte targetAddress, ref byte keyword1, ref byte keyword2)
         {
             J2534Err returnValue;

@@ -10,6 +10,9 @@ namespace J2534DotNet
         J2534Err GetConfig(int channelId, ref List<SConfig> config);
         J2534Err SetConfig(int channelId, ref List<SConfig> config);
         J2534Err ReadBatteryVoltage(int deviceId, ref int voltage);
+
+        J2534Err ReadProgrammingVoltage(int deviceId, ref int voltage);
+
         J2534Err FiveBaudInit(int channelId, byte targetAddress, ref byte keyword1, ref byte keyword2);
         J2534Err FastInit(int channelId, PassThruMsg txMsg, ref PassThruMsg rxMsg);
         J2534Err ClearTxBuffer(int channelId);

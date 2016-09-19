@@ -53,7 +53,7 @@ namespace J2534DotNet
             IntPtr patternMsg, IntPtr flowControlMsg, ref int filterId);
 
         J2534Err PassThruStopMsgFilter(int channelId, int filterId);
-        J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, int voltage);
+        J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, long voltage);
         J2534Err PassThruReadVersion(int deviceId, IntPtr firmwareVersion, IntPtr dllVersion, IntPtr apiVersion);
         J2534Err PassThruGetLastError(IntPtr errorDescription);
         J2534Err PassThruIoctl(int channelId, int ioctlID, IntPtr input, IntPtr output);
