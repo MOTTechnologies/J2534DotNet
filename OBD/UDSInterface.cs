@@ -7,8 +7,8 @@ namespace OBD
 {
     public interface UDSInterface
     {
-        bool ReadMemoryByAddress(uint address, out byte[] memory);
-        bool SecurityAccess(byte mode);
+        //void ReadMemoryByAddress( address, out byte[] memory);
+        void SecurityAccess(byte mode);
 
         bool ECUReset(byte[] command);
 

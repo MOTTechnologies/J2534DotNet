@@ -112,7 +112,7 @@
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(155, 23);
             this.button2.TabIndex = 7;
-            this.button2.Text = "Security Access Level 1";
+            this.button2.Text = "Read Flash";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.SecurityLevel1_Click);
             // 
@@ -137,6 +137,7 @@
             this.button3.TabIndex = 9;
             this.button3.Text = "Security Access Level 2";
             this.button3.UseVisualStyleBackColor = true;
+            this.button3.Click += new System.EventHandler(this.button3_Click);
             // 
             // button4
             // 

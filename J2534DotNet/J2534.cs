@@ -59,6 +59,7 @@ namespace J2534DotNet
 
         public bool FreeLibrary()
         {
+            _IsLoaded = false;
             return m_wrapper.FreeLibrary();
         }
 

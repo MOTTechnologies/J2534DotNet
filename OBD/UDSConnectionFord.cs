@@ -57,52 +57,63 @@ namespace OBD
 
         }
 
-        public bool ReadMemoryByAddress(uint address, out byte[] memory)
+        public void ReadFlashMemory(out byte [] flashMemory)
         {
-            memory = new byte[0];
+            flashMemory = new byte[0x100000];
+            byte[] buffer;
+            for (uint i = 0x0; i <= 0xFF800; i+= 0x800)
+            {
+                ReadMemoryByAddress(i, out buffer);
+                System.Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
+            }
+        }
 
+        public void ReadMemoryByAddress(long address, out byte[] memory)
+        {
             //Send the read memory request
-            byte[] txMsgBytes = { (byte)UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, 0, 0, 0, 8, 0 };
-            if (!SendMessage(txMsgBytes)) return false;
+
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, (byte)((address >> 16) & 0xFF), (byte)((address >> 8) & 0xFF), (byte)((address) & 0xFF), 0x08,0 };
+            SendMessage(txMsgBytes);
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> rxMsgs;
-            if (!ReadAllMessages(out rxMsgs)) return false;
+            ReadAllMessages(out rxMsgs,1);
 
             //Find the start of the response and parse it.
             PassThruMsg memoryResponse;
             UDScmd.Response subFunctionResponse;
             int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
-            if (startOfMessageIndex == -1) return false;
+            if (startOfMessageIndex == -1) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
             memoryResponse = rxMsgs[startOfMessageIndex];
 
             if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out memory)) {
-                return false;
+                throw new UDSException(subFunctionResponse);
             }
-
-            return true;
         }
 
-        public bool SecurityAccess(byte subFunction)
+        public void SecurityAccess(byte subFunction)
         {
             //TODO handle exceptions
-            
+
+            //m_status = m_j2534Interface.PassThruConnect(m_deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref m_channelId);
 
             //Send the security request
             PassThruMsg txMessage;
-            byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction };
-            if (!SendMessage(txMsgBytes)) return false;
+
+            byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction};
+            SendMessage(txMsgBytes);
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> rxMsgs;
-            if (!ReadAllMessages(out rxMsgs)) return false;
+            ReadAllMessages(out rxMsgs);
 
             //Find the start of the response and parse it.
             byte[] payload;
             UDScmd.Response subFunctionResponse;
             PassThruMsg seedKeyResponse;
             int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
-            if (startOfMessageIndex == -1) return false;
+
+            if (startOfMessageIndex == -1) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
             seedKeyResponse = rxMsgs[startOfMessageIndex];
 
             //needs to respond with 00 00 07 e8 67 03 xx xx xx
@@ -115,19 +126,20 @@ namespace OBD
                 if(subFunctionResponse == UDScmd.Response.UNKNOWN)
                 {
                     //no error code supplied, something else went wrong
+                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
                 }
                 else
                 {
                     //We got a sub function error code
+                    throw new UDSException(subFunctionResponse);
                 }
-                return false;
             }
             else
             {
                 if (payload.Length < 3)
                 {
                     //Incorrect seed response length
-                    return false;
+                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
                 }
                 else
                 {
@@ -135,25 +147,29 @@ namespace OBD
                     var seedresponse = CalculateResponseFromSeed(0x7E0, subFunction, payload);
 
                     txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
+                    //txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
+
                     PassThruMsg txMsg;
-                    if (!SendMessage(txMsgBytes)) return false;
+                    SendMessage(txMsgBytes);
 
                     //Attempt to read at least 1 message as a reply
-                    if (!ReadAllMessages(out rxMsgs)) return false;
+                    ReadAllMessages(out rxMsgs);
 
                     //Get the response
                     startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
-                    if (startOfMessageIndex == -1) return false;
+                    if (startOfMessageIndex == -1) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
 
+                    var unlockResponse = rxMsgs[startOfMessageIndex];
                     //needs to be 00 00 07 E8 67 04 (mode+1)  (or 67 02)
-                    if (!ParseUDSResponse(seedKeyResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload))
+                    var b = unlockResponse.GetBytes();
+                    byte[] payload2;
+                    if (!ParseUDSResponse(unlockResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload2))
                     {
                         //Inform the user of the error
-                        return false;
+                        throw new UDSException(subFunctionResponse);
                     }
 
                     //We successfully entered the serurity level!
-                    return true;
 
                 }
             }
@@ -175,8 +191,14 @@ namespace OBD
             int seed = (seedbytes[0] << 16) | (seedbytes[1] << 8) | seedbytes[2];
 
             byte[] secretKey;
-            if (mode == 1) if (SecretKeysLevel1.TryGetValue(device, out secretKey)) return GenerateSeedKeyResponse(seed, secretKey);
-                else if (SecretKeysLevel2.TryGetValue(device, out secretKey)) return GenerateSeedKeyResponse(seed, secretKey);
+            if (mode == 1)
+            {
+                if (SecretKeysLevel1.TryGetValue(device, out secretKey)) return GenerateSeedKeyResponse(seed, secretKey);
+            }
+            else
+            {
+                if (SecretKeysLevel2.TryGetValue(device, out secretKey)) return GenerateSeedKeyResponse(seed, secretKey);
+            }
 
             return -1;
         }
@@ -243,10 +265,10 @@ namespace OBD
         /// <returns></returns>
         bool ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode, byte txSubFunction, out UDScmd.Response functionResponse, out byte[] payload)
         {
-            payload = new byte[0];
             functionResponse = UDScmd.Response.UNKNOWN;
             bool positiveReponse = false;
             var rxMsgBytes = rxMsg.GetBytes();
+            payload = rxMsgBytes;
 
             //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
             //If we could use some kind of HEX regex this would be a bit neater
@@ -261,7 +283,8 @@ namespace OBD
                         break;
                     case 1:
                         if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
-                        return false;
+                        else return false;
+                        break;
                     case 2:
                         if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Response.SUCCESS)
                         {
@@ -276,15 +299,24 @@ namespace OBD
                         stateMachine = 3;
                         break;
                     case 3:
-                        functionResponse = (UDScmd.Response)rxMsgBytes[i];
-                        if (positiveReponse && rxMsgBytes[i] == txSubFunction)
+                        if (i + 1 <= rxMsgBytes.Length - 1)
+                        {
+                            functionResponse = (UDScmd.Response)rxMsgBytes[i + 1];
+                        } else
+                        {
+
+                        }
+
+                        //27 01 should respond with either 27 01 xx xx xx 0r 27 02 
+                        //if (positiveReponse && rxMsgBytes[i] == txSubFunction)
+                        if (positiveReponse)
                         {
                             //We have a positive response and a positive subfunction code (subfunction is reflected)
-                            int payloadLength = rxMsgBytes.Length - i;
+                            int payloadLength = rxMsgBytes.Length - (i+1);
                             if (payloadLength > 0)
                             {
                                 payload = new byte[payloadLength];
-                                Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
+                                Array.Copy(rxMsgBytes, i+1, payload, 0, payloadLength);
                             }
                             return true;
                         }
@@ -388,6 +420,7 @@ namespace OBD
             TORQUE_CONVERTER_CLUTCH_LOCKED = 0x91,
             VOLTAGE_TOO_HIGH = 0x92,
             VOLTAGE_TOO_LOW = 0x93,
+
             UNKNOWN = 0xFF,
         }
         public enum DTCStatusByte : byte

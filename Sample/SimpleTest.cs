@@ -8,6 +8,8 @@ using OBD;
 namespace Sample
 {
     using J2534DotNet.Logger;
+    using System.ComponentModel;
+    using System.IO;
     using System.Runtime.InteropServices;
     using System.Threading;
 
@@ -22,11 +24,7 @@ namespace Sample
             passThru = new J2534Extended();
         }
 
-        /*
-         *  Example 1:
-         *      Detect J2534 devices
-         * 
-         */
+
         private void CmdDetectDevicesClick(object sender, EventArgs e)
         {
             // Calling J2534.GetAvailableDevices() will return a list of installed J2534 devices
@@ -177,8 +175,7 @@ namespace Sample
             {
                 J2534Extended passThru = new J2534Extended();
                 if (!connected) Connect();
-                bool UDSConnection = comm.DetectProtocol();
-                if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+                if (!connected) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
                 vin = comm.GetVin();
 
             }
@@ -205,14 +202,9 @@ namespace Sample
 
         void Connect()
         {
-            if (connected) return;
-
-
             if (!LoadJ2534()) return;
-            
 
             comm = new UDSConnectionFord(passThru);
-
 
             if (!comm.DetectProtocol())
             {
@@ -223,14 +215,11 @@ namespace Sample
             {
                 connected = true;
             }
-
-            
+           
         }
 
         bool LoadJ2534()
         {
-
-            if (passThru.IsLoaded) return true;
 
             J2534Device j2534Device;
 
@@ -242,7 +231,7 @@ namespace Sample
                 return false;
             }
 
-            if (checkBoxLogJ2534.Checked)
+            if (!checkBoxLogJ2534.Checked)
             {
                 j2534Device = new J2534Device();
                 j2534Device.FunctionLibrary = System.IO.Directory.GetCurrentDirectory() + "\\" + "J2534DotNet.Logger.dll";
@@ -252,7 +241,10 @@ namespace Sample
             }
 
             //If there is only one DLL to choose from then load it
-            if (availableJ2534Devices.Count == 1) passThru.LoadLibrary(availableJ2534Devices[0]);
+            if (availableJ2534Devices.Count >= 1)
+            {
+                return passThru.LoadLibrary(availableJ2534Devices[1]);
+            }
             else
             {
                 var sd = new SelectDevice();
@@ -268,7 +260,7 @@ namespace Sample
 
         void Disconnect()
         {
-            if (!connected) comm.Disconnect();
+            if(comm != null) comm.Disconnect();
             connected = false;
             passThru.FreeLibrary();
 
@@ -279,62 +271,134 @@ namespace Sample
             log.Text += text + Environment.NewLine;
         }
 
+
+        private void ReadFlashAsyncronously()
+        {
+
+
+            // this is your presumably long-running method
+            Action<byte> exec = ReadFlash;
+
+            ProgressForm progressForm = new ProgressForm("Reading flash...");
+
+            BackgroundWorker b = new BackgroundWorker();
+
+            // set the worker to call your long-running method
+            b.DoWork += (object sender, DoWorkEventArgs e) => {
+                exec.Invoke(1);
+            };
+
+            // set the worker to close your progress form when it's completed
+            b.RunWorkerCompleted += (object sender, RunWorkerCompletedEventArgs e) => {
+                if (progressForm != null && progressForm.Visible) progressForm.Close();
+
+            };
+            progressForm.Owner = (Form)this.Parent;
+            progressForm.StartPosition = FormStartPosition.CenterScreen;
+            progressForm.Show();
+            progressForm.StartScroll();
+
+            b.RunWorkerAsync();
+        }
+
         private void SecurityLevel1_Click(object sender, EventArgs e)
+        {
+            //adFlash(1); ;
+            ReadFlashAsyncronously();
+        }
+
+        void ReadFlash(byte mode)
         {
             try
             {
-                if (!connected) Connect();
+                Connect();
 
-                if (!comm.DetectProtocol())
+                if (!connected)
                 {
                     MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
                     return;
                 }
 
-                float voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
-                if(voltage < 15000)
+                //Ensure the programming voltage is 0v as the PCM needs to see a transition from 0 -> 18v
+                float voltage = comm.ReadProgrammingVoltage();
+                if (voltage > 1)
                 {
-                    MessageBox.Show("Failed to set programming voltage");
-                    return;
-                }
-                MessageBox.Show("Please turn the vehicle ignition off, wait 3 seconds, then turn it back on");
+                    voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 0xFFFFFFFF);
+                    if (voltage > 1)
+                    {
+                        MessageBox.Show("Failed to set programming voltage (pin 13) to 0 volts, measured: " + voltage + " V");
+                        return;
+                    }
 
+                }
 
-                if (!comm.SecurityAccess(0x01))
+                if (mode == 1)
                 {
-                    MessageBox.Show(String.Format("Error entering security mode.  Error: {0}", comm.GetLastError()));
+                    voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
+                    if (voltage < 15)
+                    {
+                        MessageBox.Show("Failed to set programming voltage (pin 13) to 18 volts, measured: " + voltage + " V");
+                        return;
+                    }
+                    MessageBox.Show("Please turn the ignition off, wait 3 seconds, then turn it back on before pressing OK.");
+
+                    //Ensure the programming voltage is still high after an ignition cycle
+                    voltage = comm.ReadProgrammingVoltage();
+                    if (voltage < 15)
+                    {
+                        MessageBox.Show("Programming voltage did not persist after ignition power cycle), measured: " + voltage + " V");
+                        return;
+                    }
                 }
-                else
-                {
-                    byte[] memory;
-                    comm.ReadMemoryByAddress(0, out memory);
-                    //ssageBox.Show("Successfull entered level 1 security mode!");
-                }
+
+                //Enter level 1 seecurity mode
+                comm.SecurityAccess(mode);
+
+                byte[] memory;
+                comm.ReadFlashMemory(out memory);
+
+                SaveFile(memory);
+
 
             }
             catch (OBDException obdEx)
             {
-                MessageBox.Show("Error retrieving VIN due to OBD error: " + obdEx.Message);
+                MessageBox.Show("Error entering security level due to OBD error: " + obdEx.Message);
             }
             catch (J2534Exception j2534Ex)
             {
-                MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+                MessageBox.Show("Error entering security level due to J2534 error: " + j2534Ex.Message);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Unknown error occured whilst retrieving VIN: " + ex.Message);
+                MessageBox.Show("Unknown error occured whilst entering security level: " + ex.Message);
             }
+            finally
+            {
+                Disconnect();
+            }
+        }
 
-            //Download the PCM now
-            //byte[] bytes;
-            //UpdateLog("ReadMemoryByAddress");
+        void SaveFile(byte [] rawBinaryFile)
+        {
+            SaveFileDialog savefile = new SaveFileDialog();
 
-            //bool success = comm.ReadMemoryByAddress(0, out bytes);
+            savefile.Filter = "Binary File|*.bin";
 
-            //comm.Disconnect();
+            if (savefile.ShowDialog() != DialogResult.OK) return;
+            
+            try
+            {
+                File.WriteAllBytes(savefile.FileName, rawBinaryFile);
 
-            // When we are done with the device, we can free the library.
-            //passThru.FreeLibrary();
+                MessageBox.Show("Successfully Saved File!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error Saving File", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+             
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -400,6 +464,11 @@ namespace Sample
         private void button5_Click(object sender, EventArgs e)
         {
             SetVoltage(true);
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            ReadFlash(3);
         }
     }
 }

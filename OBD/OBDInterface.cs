@@ -27,7 +27,7 @@ namespace OBD
 
         bool GetBatteryVoltage(ref double voltage);
 
-        bool SendMessage(byte [] txMsgBytes);
+        void SendMessage(byte [] txMsgBytes, bool useHeader);
 
     }
 

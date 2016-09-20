@@ -79,12 +79,21 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="ProgressForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ProgressForm.Designer.cs">
+      <DependentUpon>ProgressForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="SimpleTest.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="SimpleTest.Designer.cs">
       <DependentUpon>SimpleTest.cs</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="ProgressForm.resx">
+      <DependentUpon>ProgressForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="SimpleTest.resx">
       <DependentUpon>SimpleTest.cs</DependentUpon>
     </EmbeddedResource>

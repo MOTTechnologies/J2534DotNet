@@ -35,13 +35,35 @@ namespace J2534DotNet
 {
     public class J2534Extended : J2534, IJ2534Extended
     {
-        public J2534Err GetConfig(int channelId, ref List<SConfig> config)
+        unsafe public J2534Err GetConfig(int channelId, ref List<SConfig> config)
         {
-            IntPtr input = IntPtr.Zero;
-            IntPtr output = IntPtr.Zero;
+            SConfigList sConfigList = new SConfigList();
+            sConfigList.ListPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(SConfig)) * config.Count);
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.GET_CONFIG, input, output);
+            for (int i = 0; i < config.Count; i++) { 
+                Marshal.StructureToPtr(config[i], new IntPtr(sConfigList.ListPtr.ToInt64() + Marshal.SizeOf(typeof(SConfig))*i), false);
+            }
+
+            IntPtr output = IntPtr.Zero;
+            IntPtr input = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(SConfigList)));
+
+            Marshal.StructureToPtr(sConfigList, input, false);
+
+            var err = (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.GET_CONFIG, input, output);
+
+            var configList = input.AsStruct<SConfigList>().GetList();
+
+
+            config = new List<SConfig>();
+            for (int i = 0; i < configList.Count; i++)
+            {
+                config.Add(configList[i]);
+            }
+
+            return err;
+
         }
+
 
         public J2534Err SetConfig(int channelId, ref List<SConfig> config)
         {
@@ -186,7 +208,7 @@ namespace J2534DotNet
         /// <param name="numMsgs"></param>
         /// <param name="timeout"></param>
         /// <returns></returns>
-        public J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, int max = 500)
+        public J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, int max = 1000)
         {
             messages = new List<PassThruMsg>();
 
@@ -198,13 +220,21 @@ namespace J2534DotNet
             m_status = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
 
             //If we didn't get a single reply return the error code
-            if (m_status != J2534Err.STATUS_NOERROR) return m_status;
+            if (m_status != J2534Err.STATUS_NOERROR)
+            {
+                return m_status;
+            }
+            messages.AddRange(rxMsgs.AsMsgList(numMsgs));
 
             m_status2 = m_status;
             while (J2534Err.STATUS_NOERROR == m_status2)
             {
-                m_status = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
-                if (m_status2 == J2534Err.STATUS_NOERROR) messages.AddRange(rxMsgs.AsMsgList(numMsgs));
+                m_status2 = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
+                if (m_status2 == J2534Err.STATUS_NOERROR)
+                {
+                    var msgs = rxMsgs.AsMsgList(numMsgs);
+                    foreach (var msg in msgs) messages.Add(msg);
+                }
                 count++;
                 if (count > max) break;
             }
