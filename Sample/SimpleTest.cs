@@ -17,7 +17,7 @@ namespace Sample
     {
         bool connected = false;
         J2534Extended passThru;
-        UDSConnectionFord comm;
+        UDSFord comm;
         public SimpleTest()
         {
             InitializeComponent();
@@ -145,25 +145,15 @@ namespace Sample
             J2534Extended passThru = new J2534Extended(); ;// = Loader.Lib;
             double voltage = 0;
 
-            if (!connected) Connect();
+            if (!Connect()) return;
 
-            
-            if (!comm.DetectProtocol())
-            {
-                MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
-                //Disconnect();
-                return;
-            }
             if (!comm.GetBatteryVoltage(ref voltage))
             {
                 MessageBox.Show(String.Format("Error reading voltage.  Error: {0}", comm.GetLastError()));
-                //Disconnect();
-                return;
             }
-            //Disconnect();
 
-            // When we are done with the device, we can free the library.
-            passThru.FreeLibrary();
+            Disconnect();
+
             txtVoltage.Text = voltage + @" V";
         }
 
@@ -174,8 +164,9 @@ namespace Sample
             try
             {
                 J2534Extended passThru = new J2534Extended();
-                if (!connected) Connect();
-                if (!connected) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+                
+                if (!Connect()) return;
+
                 vin = comm.GetVin();
 
             }
@@ -200,22 +191,19 @@ namespace Sample
         }
 
 
-        void Connect()
+        bool Connect()
         {
-            if (!LoadJ2534()) return;
-
-            comm = new UDSConnectionFord(passThru);
-
-            if (!comm.DetectProtocol())
-            {
-                MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
-                connected = false;
+            try {
+                LoadJ2534();
+                comm = new UDSFord(passThru);
+                comm.ConnectISO15765();
             }
-            else
+            catch (Exception e)
             {
-                connected = true;
+                MessageBox.Show("Failed to make OBD ISO15765 connection due to: " + e.Message);
+                return false;
             }
-           
+            return true;
         }
 
         bool LoadJ2534()
@@ -261,8 +249,7 @@ namespace Sample
         void Disconnect()
         {
             if(comm != null) comm.Disconnect();
-            connected = false;
-            passThru.FreeLibrary();
+            if(passThru != null) passThru.FreeLibrary();
 
         }
 
@@ -272,52 +259,49 @@ namespace Sample
         }
 
 
-        private void ReadFlashAsyncronously()
+
+        BackgroundWorker flashReadBW;
+        ProgressForm flashReadProgressForm;
+        private void ReadFlash_Click(object sender, EventArgs e)
         {
+            this.Enabled = false;
 
+            flashReadProgressForm = new ProgressForm("Reading PCM flash...");
 
-            // this is your presumably long-running method
-            Action<byte> exec = ReadFlash;
+            flashReadBW = new BackgroundWorker();
 
-            ProgressForm progressForm = new ProgressForm("Reading flash...");
+            flashReadBW.WorkerReportsProgress = true;
 
-            BackgroundWorker b = new BackgroundWorker();
+            flashReadBW.DoWork += new DoWorkEventHandler(ReadFlash);
+            flashReadBW.ProgressChanged += new ProgressChangedEventHandler(UpdateFlashReadProgress);
+            flashReadBW.RunWorkerCompleted += new RunWorkerCompletedEventHandler(FlashReadFinished);
 
-            // set the worker to call your long-running method
-            b.DoWork += (object sender, DoWorkEventArgs e) => {
-                exec.Invoke(1);
-            };
+            flashReadProgressForm.Owner = (Form)this.Parent;
+            flashReadProgressForm.StartPosition = FormStartPosition.CenterScreen;
+            flashReadProgressForm.Show();
 
-            // set the worker to close your progress form when it's completed
-            b.RunWorkerCompleted += (object sender, RunWorkerCompletedEventArgs e) => {
-                if (progressForm != null && progressForm.Visible) progressForm.Close();
-
-            };
-            progressForm.Owner = (Form)this.Parent;
-            progressForm.StartPosition = FormStartPosition.CenterScreen;
-            progressForm.Show();
-            progressForm.StartScroll();
-
-            b.RunWorkerAsync();
+            flashReadBW.RunWorkerAsync();
         }
 
-        private void SecurityLevel1_Click(object sender, EventArgs e)
+        private void FlashReadFinished(object sender, RunWorkerCompletedEventArgs e)
         {
-            //adFlash(1); ;
-            ReadFlashAsyncronously();
+            flashReadProgressForm.Close();
+            this.Enabled = true;
         }
 
-        void ReadFlash(byte mode)
+        private void UpdateFlashReadProgress(object sender, ProgressChangedEventArgs e)
         {
+            flashReadProgressForm.UpdatePercentage(e.ProgressPercentage);
+        }
+
+        void ReadFlash(object sender, DoWorkEventArgs e)
+        {
+            //ReadFlashMemoryTest(flashReadBW);
+            //return;
+
             try
             {
-                Connect();
-
-                if (!connected)
-                {
-                    MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
-                    return;
-                }
+                if (!Connect()) return;
 
                 //Ensure the programming voltage is 0v as the PCM needs to see a transition from 0 -> 18v
                 float voltage = comm.ReadProgrammingVoltage();
@@ -329,33 +313,30 @@ namespace Sample
                         MessageBox.Show("Failed to set programming voltage (pin 13) to 0 volts, measured: " + voltage + " V");
                         return;
                     }
-
                 }
 
-                if (mode == 1)
+                voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
+                if (voltage < 15)
                 {
-                    voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
-                    if (voltage < 15)
-                    {
-                        MessageBox.Show("Failed to set programming voltage (pin 13) to 18 volts, measured: " + voltage + " V");
-                        return;
-                    }
-                    MessageBox.Show("Please turn the ignition off, wait 3 seconds, then turn it back on before pressing OK.");
-
-                    //Ensure the programming voltage is still high after an ignition cycle
-                    voltage = comm.ReadProgrammingVoltage();
-                    if (voltage < 15)
-                    {
-                        MessageBox.Show("Programming voltage did not persist after ignition power cycle), measured: " + voltage + " V");
-                        return;
-                    }
+                    MessageBox.Show("Failed to set programming voltage (pin 13) to 18 volts, measured: " + voltage + " V");
+                    return;
                 }
+                MessageBox.Show("Please turn the ignition off, wait 3 seconds, then turn it back on before pressing OK.");
+
+                //Ensure the programming voltage is still high after an ignition cycle
+                voltage = comm.ReadProgrammingVoltage();
+                if (voltage < 15)
+                {
+                    MessageBox.Show("Programming voltage did not persist after ignition power cycle), measured: " + voltage + " V");
+                    return;
+                }
+
 
                 //Enter level 1 seecurity mode
-                comm.SecurityAccess(mode);
+                comm.SecurityAccess(0x01);
 
-                byte[] memory;
-                comm.ReadFlashMemory(out memory);
+                byte[] memory = comm.ReadFlashMemory(flashReadBW);
+
 
                 SaveFile(memory);
 
@@ -377,6 +358,20 @@ namespace Sample
             {
                 Disconnect();
             }
+        }
+
+        public byte[] ReadFlashMemoryTest(BackgroundWorker progressReporter = null)
+        {
+            byte[] flashMemory = new byte[0x100000];
+            for (uint i = 0x0; i <= 0xFF800; i += 0x800)
+            {
+                Thread.Sleep(10);
+
+                //Report progress back to the GUI if there is one
+                if (progressReporter != null) progressReporter.ReportProgress((int)((float)i / (float)0xFF800 * 100.0f));
+
+            }
+            return flashMemory;
         }
 
         void SaveFile(byte [] rawBinaryFile)
@@ -428,7 +423,7 @@ namespace Sample
                     return;
                 }
 
-                if (comm == null) comm = new UDSConnectionFord(passThru);
+                if (comm == null) comm = new UDSFord(passThru);
 
                 if (off)
                 {
@@ -442,22 +437,22 @@ namespace Sample
                     uint volts = 0;
                     if (!UInt32.TryParse(textBoxVolts.Text, out volts)) return;
 
-                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13 " + volts);
+                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13 " + volts + " mV");
                     float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, volts);
-                    UpdateLog("Voltage = : " + programmingVoltage);
+                    UpdateLog("Voltage = " + programmingVoltage + "V");
                     toggle = true;
                 }
 
             }
             catch (J2534Exception j2534Ex)
             {
-                UpdateLog("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
-                MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
+                UpdateLog("Error Setting Voltage due to J2534 error: " + j2534Ex.Message);
+                MessageBox.Show("Error Setting Voltage due to J2534 error: " + j2534Ex.Message);
             }
             catch (Exception ex)
             {
-                UpdateLog("Unknown error occured whilst retrieving VIN: " + ex.Message);
-                MessageBox.Show("Unknown error occured whilst retrieving VIN: " + ex.Message);
+                UpdateLog("Unknown Error Occured Whilst Setting Voltage: " + ex.Message);
+                MessageBox.Show("Unknown Error Occured Whilst Setting Voltage : " + ex.Message);
             }
         }
 
@@ -468,7 +463,10 @@ namespace Sample
 
         private void button3_Click(object sender, EventArgs e)
         {
-            ReadFlash(3);
+
         }
+
+
+
     }
 }

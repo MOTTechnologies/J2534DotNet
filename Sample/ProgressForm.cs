@@ -13,15 +13,20 @@ namespace Sample
     public partial class ProgressForm : Form
     {
 
+        public void UpdatePercentage(int percentage)
+        {
+            progressBar.Value = percentage;
+        }
+
         public ProgressForm(string titleText)
         {
             InitializeComponent();
             mainLabel.Text = titleText;
         }
-         
-        public void StartScroll()
+        
+        public void StartScroll(bool percentage = false)
         {
-            progressBar.Style = ProgressBarStyle.Marquee;
+             progressBar.Style = ProgressBarStyle.Marquee;
         }
 
         public void StopScroll()
@@ -42,12 +47,12 @@ namespace Sample
 
         private void ProgressForm_Load(object sender, EventArgs e)
         {
-            this.Owner.Enabled = false;
+            //this.Owner.Enabled = false;
         }
 
         private void ProgressForm_FormClosed(object sender, FormClosedEventArgs e)
         {
-            this.Owner.Enabled = true;
+            //this.Owner.Enabled = true;
         }
     }
 }

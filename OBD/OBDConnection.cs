@@ -225,50 +225,20 @@ namespace OBD
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
         }
 
-
         public bool IsConnected()
         {
             return m_isConnected;
         }
 
-        public bool OpenConnection()
+        public void ConnectISO15765()
         {
-            //if (m_deviceId != 0) return true;
-
             m_deviceId = 0;
             m_status = m_j2534Interface.PassThruOpen(IntPtr.Zero, ref m_deviceId);
-            if (m_status != J2534Err.STATUS_NOERROR)
-                return false;
-            return true;
-        }
+            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
 
-        public bool DetectProtocol()
-        {
-
-
-            // possible return values:
-            //  ProtocolID.ISO15765; // CAN
-            //  ProtocolID.ISO9141;  // ISO-K
-            //  ProtocolID.J1850PWM;  // J1850PWM
-            //  ProtocolID.J1850VPW;  // J1850VPW
-            if (!OpenConnection()) return false;
-
-            if (ConnectIso15765())
-            {
-                protocolId = ProtocolID.ISO15765;
-                m_isConnected = true;
-            }
-            return true;
-        }
-
-        public bool ConnectIso15765()
-        {
             byte[] value;
             m_status = m_j2534Interface.PassThruConnect(m_deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref m_channelId);
-            if (J2534Err.STATUS_NOERROR != m_status)
-            {
-                return false;
-            }
+            if (J2534Err.STATUS_NOERROR != m_status) throw new J2534Exception(m_status);
 
             //List<SConfig> configBits = new List<SConfig>();
             //SConfig conf = new SConfig();
@@ -304,7 +274,7 @@ namespace OBD
                 if (J2534Err.STATUS_NOERROR != m_status)
                 {
                     m_j2534Interface.PassThruDisconnect(m_channelId);
-                    return false;
+                    throw new J2534Exception(m_status);
                 }
 	        }
             
@@ -313,11 +283,11 @@ namespace OBD
             if(value.Length <= 0)
             {
                 m_status = m_j2534Interface.PassThruDisconnect(m_channelId);
-                return false;
+                throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
             }
-             
 
-            return true;
+            protocolId = ProtocolID.ISO15765;
+
         }
 
         public bool Disconnect()

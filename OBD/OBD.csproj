@@ -47,7 +47,7 @@
     <Compile Include="OBDConnection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UDSInterface.cs" />
-    <Compile Include="UDSConnectionFord.cs" />
+    <Compile Include="UDSFord.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\J2534DotNet\J2534DotNet.csproj">

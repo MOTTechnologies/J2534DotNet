@@ -12,8 +12,8 @@ namespace OBD
     public interface OBDInterface
     {
         bool IsConnected();
-        bool DetectProtocol();
         bool Disconnect();
+        void ConnectISO15765();
 
         void ReadObdPid(OBDcmd.Mode mode, out byte[] payload, byte pid = 0);
 

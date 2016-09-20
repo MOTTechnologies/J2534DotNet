@@ -150,48 +150,64 @@ namespace J2534DotNet
                 Open = (PassThruOpen) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruOpen));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruClose");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 Close = (PassThruClose) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruClose));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruConnect");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 Connect = (PassThruConnect) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruConnect));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruDisconnect");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 Disconnect = (PassThruDisconnect) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruDisconnect));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruReadMsgs");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 ReadMsgs = (PassThruReadMsgs) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruReadMsgs));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruWriteMsgs");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 WriteMsgs = (PassThruWriteMsgs) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruWriteMsgs));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruStartPeriodicMsg");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 StartPeriodicMsg = (PassThruStartPeriodicMsg) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruStartPeriodicMsg));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruStopPeriodicMsg");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 StopPeriodicMsg = (PassThruStopPeriodicMsg) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruStopPeriodicMsg));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruStartMsgFilter");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
@@ -205,36 +221,48 @@ namespace J2534DotNet
                 StartPassBlockMsgFilter = (PassThruStartPassBlockMsgFilter) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruStartPassBlockMsgFilter));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruStopMsgFilter");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 StopMsgFilter = (PassThruStopMsgFilter) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruStopMsgFilter));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruSetProgrammingVoltage");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 SetProgrammingVoltage = (PassThruSetProgrammingVoltage) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruSetProgrammingVoltage));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruReadVersion");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 ReadVersion = (PassThruReadVersion) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruReadVersion));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruGetLastError");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 GetLastError = (PassThruGetLastError) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruGetLastError));
+            else
+                return false;
 
             pAddressOfFunctionToCall = NativeMethods.GetProcAddress(m_pDll, "PassThruIoctl");
             if (pAddressOfFunctionToCall != IntPtr.Zero)
                 Ioctl = (PassThruIoctl) Marshal.GetDelegateForFunctionPointer(
                     pAddressOfFunctionToCall,
                     typeof (PassThruIoctl));
+            else
+                return false;
 
             return true;
         }

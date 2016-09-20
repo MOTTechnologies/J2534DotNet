@@ -1,6 +1,7 @@
 ﻿using J2534DotNet;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -10,9 +11,9 @@ namespace OBD
     /// <summary>
     /// Unified Diagnostic Services (UDS) is a vendor specific extension of OBD hence
     /// we literally extend our OBD implementation and implement the UDS interface
-    /// This UDS implementation requires a J2534
+    /// This UDS implementation is via J2534
     /// </summary>
-    public class UDSConnectionFord : OBDConnection, UDSInterface
+    public class UDSFord : OBDConnection, UDSInterface
     {
 		#region details
 		//The following commands are supported by the spanish oak PCM
@@ -52,20 +53,27 @@ namespace OBD
 		
 		#endregion details
 
-        public UDSConnectionFord(IJ2534Extended j2534Interface) : base(j2534Interface)
+        public UDSFord(IJ2534Extended j2534Interface) : base(j2534Interface)
         {
-
         }
 
-        public void ReadFlashMemory(out byte [] flashMemory)
+        public byte[] ReadFlashMemory(BackgroundWorker progressReporter = null)
         {
-            flashMemory = new byte[0x100000];
+            byte[] flashMemory = new byte[0x100000];
             byte[] buffer;
             for (uint i = 0x0; i <= 0xFF800; i+= 0x800)
             {
                 ReadMemoryByAddress(i, out buffer);
+
+                //We recieved an incorrect amount of data, there is no way to handle this error so bubble it back to the user
+                if (buffer.Length != 0x800) throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
                 System.Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
+
+                //Report progress back to the GUI if there is one
+                if (progressReporter != null) progressReporter.ReportProgress((int)((float)i / (float)0xFF800 * 100.0f));
+
             }
+            return flashMemory;
         }
 
         public void ReadMemoryByAddress(long address, out byte[] memory)

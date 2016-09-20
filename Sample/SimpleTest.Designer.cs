@@ -114,7 +114,7 @@
             this.button2.TabIndex = 7;
             this.button2.Text = "Read Flash";
             this.button2.UseVisualStyleBackColor = true;
-            this.button2.Click += new System.EventHandler(this.SecurityLevel1_Click);
+            this.button2.Click += new System.EventHandler(this.ReadFlash_Click);
             // 
             // checkBoxLogJ2534
             // 

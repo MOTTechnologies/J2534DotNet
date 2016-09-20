@@ -60,7 +60,9 @@ namespace J2534DotNet
         public bool FreeLibrary()
         {
             _IsLoaded = false;
-            return m_wrapper.FreeLibrary();
+            if(m_wrapper != null) return m_wrapper.FreeLibrary();
+            return true;
+
         }
 
         public J2534Err PassThruOpen(IntPtr name, ref int deviceId)
