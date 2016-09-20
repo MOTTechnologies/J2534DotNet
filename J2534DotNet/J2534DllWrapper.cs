@@ -118,7 +118,7 @@ namespace J2534DotNet
         public PassThruStopMsgFilter StopMsgFilter;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate int PassThruSetProgrammingVoltage(int deviceId, long pinNumber, long voltage);
+        public delegate int PassThruSetProgrammingVoltage(int deviceId, uint pinNumber, uint voltage);
 
         public PassThruSetProgrammingVoltage SetProgrammingVoltage;
 

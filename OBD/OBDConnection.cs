@@ -81,10 +81,11 @@ namespace OBD
         }
 
 
-        public float PassThruSetProgrammingVoltage(PinNumber pinNumber, long milliVolts)
+        public float PassThruSetProgrammingVoltage(PinNumber pinNumber, uint milliVolts)
         {
+            if (!OpenConnection()) return 0;
             if (milliVolts < 5000) milliVolts = 5000;
-            if (milliVolts > 20000 && milliVolts < 0xFFFFFFFE ) milliVolts = 20000;
+            if (milliVolts > 20000 && milliVolts != 0xFFFFFFFE && milliVolts != 0xFFFFFFFF) milliVolts = 20000;
 
             m_status = m_j2534Interface.PassThruSetProgrammingVoltage(m_deviceId, pinNumber, milliVolts);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
@@ -226,6 +227,17 @@ namespace OBD
             return m_isConnected;
         }
 
+        public bool OpenConnection()
+        {
+            if (m_deviceId != 0) return true;
+
+            m_deviceId = 0;
+            m_status = m_j2534Interface.PassThruOpen(IntPtr.Zero, ref m_deviceId);
+            if (m_status != J2534Err.STATUS_NOERROR)
+                return false;
+            return true;
+        }
+
         public bool DetectProtocol()
         {
             // possible return values:
@@ -233,11 +245,8 @@ namespace OBD
             //  ProtocolID.ISO9141;  // ISO-K
             //  ProtocolID.J1850PWM;  // J1850PWM
             //  ProtocolID.J1850VPW;  // J1850VPW
+            if (!OpenConnection()) return false;
 
-            m_deviceId = 0;
-            m_status = m_j2534Interface.PassThruOpen(IntPtr.Zero, ref m_deviceId);
-            if (m_status != J2534Err.STATUS_NOERROR)
-                return false;
             if (ConnectIso15765())
             {
                 protocolId = ProtocolID.ISO15765;

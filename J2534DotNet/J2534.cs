@@ -64,27 +64,32 @@ namespace J2534DotNet
 
         public J2534Err PassThruOpen(IntPtr name, ref int deviceId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             var result = (J2534Err)m_wrapper.Open(name, ref deviceId);
             return result;
         }
 
         public J2534Err PassThruClose(int deviceId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.Close(deviceId);
         }
 
         public J2534Err PassThruConnect(int deviceId, ProtocolID protocolId, ConnectFlag flags, BaudRate baudRate, ref int channelId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.Connect(deviceId, (int)protocolId, (int)flags, (int)baudRate, ref channelId);
         }
 
         public J2534Err PassThruDisconnect(int channelId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.Disconnect(channelId);
         }
 
         public J2534Err PassThruReadMsgs(int channelId, IntPtr msgs, ref int numMsgs, int timeout)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             try
             {
                 return (J2534Err)m_wrapper.ReadMsgs(channelId, msgs, ref numMsgs, timeout);
@@ -97,22 +102,26 @@ namespace J2534DotNet
 
         public J2534Err PassThruWriteMsgs(int channelId, IntPtr msgs, ref int numMsgs, int timeout)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.WriteMsgs(channelId, msgs, ref numMsgs, timeout);
         }
 
         public J2534Err PassThruStartPeriodicMsg(int channelId, IntPtr msg, ref int msgId, int timeInterval)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.StartPeriodicMsg(channelId, msg, ref msgId, timeInterval);
         }
 
         public J2534Err PassThruStopPeriodicMsg(int channelId, int msgId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.StopPeriodicMsg(channelId, msgId);
         }
 
         public J2534Err PassThruStartMsgFilter(int channelid, FilterType filterType, IntPtr maskMsg,
             IntPtr patternMsg, IntPtr flowControlMsg, ref int filterId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return
                 (J2534Err)
                     m_wrapper.StartMsgFilter(channelid, (int) filterType, maskMsg, patternMsg,
@@ -121,26 +130,31 @@ namespace J2534DotNet
 
         public J2534Err PassThruStopMsgFilter(int channelId, int filterId)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.StopMsgFilter(channelId, filterId);
         }
 
-        public J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, long voltage)
+        public J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, uint voltage)
         {
-            return (J2534Err)m_wrapper.SetProgrammingVoltage(deviceId, (int)pinNumber, voltage);
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
+            return (J2534Err)m_wrapper.SetProgrammingVoltage(deviceId, (uint)pinNumber, voltage);
         }
 
         public J2534Err PassThruReadVersion(int deviceId, IntPtr firmwareVersion, IntPtr dllVersion, IntPtr apiVersion)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.ReadVersion(deviceId, firmwareVersion, dllVersion, apiVersion);
         }
 
         public J2534Err PassThruGetLastError(IntPtr errorDescription)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.GetLastError(errorDescription);
         }
 
         public J2534Err PassThruIoctl(int channelId, int ioctlID, IntPtr input, IntPtr output)
         {
+            if (!IsLoaded) return J2534Err.ERR_DLL_NOT_LOADED;
             return (J2534Err)m_wrapper.Ioctl(channelId, ioctlID, input, output);
         }
     }

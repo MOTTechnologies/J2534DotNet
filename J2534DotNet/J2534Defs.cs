@@ -107,7 +107,7 @@ namespace J2534DotNet
         ISO15765_500000 = 500000
     }
 
-    public enum PinNumber : long
+    public enum PinNumber : uint
     {
         AUX = 0,
         PIN_6 = 6,
@@ -126,7 +126,7 @@ namespace J2534DotNet
         FLOW_CONTROL_FILTER = 0x03
     }
 
-    public enum J2534Err
+    public enum J2534Err : uint
     {
         STATUS_NOERROR = 0x00,
         ERR_NOT_SUPPORTED = 0x01,
@@ -154,6 +154,9 @@ namespace J2534DotNet
         ERR_NOT_UNIQUE = 0x18,
         ERR_INVALID_BAUDRATE = 0x19,
         ERR_INVALID_DEVICE_ID = 0x1A,
-        ERR_ACCESS_VIOLATION = 0x1000
+        ERR_OEM_VOLTAGE_TOO_HIGH = 0x77,
+        ERR_OEM_VOLTAGE_TOO_LOW = 0x78,
+        ERR_ACCESS_VIOLATION = 0x1000,
+        ERR_DLL_NOT_LOADED = 0x1001
     }
 }

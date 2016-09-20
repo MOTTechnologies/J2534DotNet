@@ -148,7 +148,7 @@ namespace J2534DotNet.Logger
         }
 
         [DllExport("PassThruSetProgrammingVoltage")]
-        public static J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, int voltage)
+        public static J2534Err PassThruSetProgrammingVoltage(int deviceId, PinNumber pinNumber, uint voltage)
         {
             Log.WriteTimestamp("", "PTSetProgrammingVoltage({0}, {1}, {2})", deviceId, pinNumber, voltage);
 

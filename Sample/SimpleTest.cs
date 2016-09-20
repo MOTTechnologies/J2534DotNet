@@ -149,7 +149,7 @@ namespace Sample
 
             if (!connected) Connect();
 
-            UDSConnectionFord comm = new UDSConnectionFord(passThru);
+            
             if (!comm.DetectProtocol())
             {
                 MessageBox.Show(String.Format("Error connecting to device. Error: {0}", comm.GetLastError()));
@@ -177,7 +177,6 @@ namespace Sample
             {
                 J2534Extended passThru = new J2534Extended();
                 if (!connected) Connect();
-                UDSConnectionFord comm = new UDSConnectionFord(passThru);
                 bool UDSConnection = comm.DetectProtocol();
                 if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
                 vin = comm.GetVin();
@@ -206,17 +205,14 @@ namespace Sample
 
         void Connect()
         {
-            if (connected)
-            {
-                return;
-            }
+            if (connected) return;
 
-            if (!passThru.IsLoaded)
-            {
-                if (!LoadJ2534()) return;
-            }
+
+            if (!LoadJ2534()) return;
+            
 
             comm = new UDSConnectionFord(passThru);
+
 
             if (!comm.DetectProtocol())
             {
@@ -233,6 +229,9 @@ namespace Sample
 
         bool LoadJ2534()
         {
+
+            if (passThru.IsLoaded) return true;
+
             J2534Device j2534Device;
 
             // Find all of the installed J2534 passthru devices
@@ -247,7 +246,7 @@ namespace Sample
             {
                 j2534Device = new J2534Device();
                 j2534Device.FunctionLibrary = System.IO.Directory.GetCurrentDirectory() + "\\" + "J2534DotNet.Logger.dll";
-                Thread.Sleep(1000);
+                Thread.Sleep(10);
                 var loaded = passThru.LoadLibrary(j2534Device);
                 return loaded;
             }
@@ -286,8 +285,20 @@ namespace Sample
             {
                 if (!connected) Connect();
 
-                bool UDSConnection = comm.DetectProtocol();
-                if (!UDSConnection) MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+                if (!comm.DetectProtocol())
+                {
+                    MessageBox.Show("Failed to create OBD connection. Is the ignition on?");
+                    return;
+                }
+
+                float voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
+                if(voltage < 15000)
+                {
+                    MessageBox.Show("Failed to set programming voltage");
+                    return;
+                }
+                MessageBox.Show("Please turn the vehicle ignition off, wait 3 seconds, then turn it back on");
+
 
                 if (!comm.SecurityAccess(0x01))
                 {
@@ -295,7 +306,9 @@ namespace Sample
                 }
                 else
                 {
-                    MessageBox.Show("Successfull entered level 1 security mode!");
+                    byte[] memory;
+                    comm.ReadMemoryByAddress(0, out memory);
+                    //ssageBox.Show("Successfull entered level 1 security mode!");
                 }
 
             }
@@ -338,19 +351,35 @@ namespace Sample
         bool toggle = false;
         private void setProgrammingVoltage(object sender, EventArgs e)
         {
+            SetVoltage();
+        }
+
+        void SetVoltage(bool off = false)
+        {
             try
             {
-                if (toggle)
+                if (!LoadJ2534())
                 {
-                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, 18000)");
+                    UpdateLog("Failed to load J2534 library");
+                    return;
+                }
+
+                if (comm == null) comm = new UDSConnectionFord(passThru);
+
+                if (off)
+                {
+                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, OFF)");
                     float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 0xFFFFFFFF);
                     UpdateLog("Voltage = : " + programmingVoltage);
                     toggle = false;
                 }
                 else
                 {
-                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, 18000)");
-                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
+                    uint volts = 0;
+                    if (!UInt32.TryParse(textBoxVolts.Text, out volts)) return;
+
+                    UpdateLog("setProgrammingVoltage(PinNumber.PIN_13 " + volts);
+                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, volts);
                     UpdateLog("Voltage = : " + programmingVoltage);
                     toggle = true;
                 }
@@ -368,5 +397,9 @@ namespace Sample
             }
         }
 
+        private void button5_Click(object sender, EventArgs e)
+        {
+            SetVoltage(true);
+        }
     }
 }

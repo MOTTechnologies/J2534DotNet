@@ -59,7 +59,28 @@ namespace OBD
 
         public bool ReadMemoryByAddress(uint address, out byte[] memory)
         {
-            throw new NotImplementedException();
+            memory = new byte[0];
+
+            //Send the read memory request
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, 0, 0, 0, 8, 0 };
+            if (!SendMessage(txMsgBytes)) return false;
+
+            //Attempt to read at least 1 message as a reply
+            List<PassThruMsg> rxMsgs;
+            if (!ReadAllMessages(out rxMsgs)) return false;
+
+            //Find the start of the response and parse it.
+            PassThruMsg memoryResponse;
+            UDScmd.Response subFunctionResponse;
+            int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
+            if (startOfMessageIndex == -1) return false;
+            memoryResponse = rxMsgs[startOfMessageIndex];
+
+            if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out memory)) {
+                return false;
+            }
+
+            return true;
         }
 
         public bool SecurityAccess(byte subFunction)
