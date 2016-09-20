@@ -87,7 +87,7 @@
             this.cmdReadVin.TabIndex = 4;
             this.cmdReadVin.Text = "Read VIN";
             this.cmdReadVin.UseVisualStyleBackColor = true;
-            this.cmdReadVin.Click += new System.EventHandler(this.CmdReadVinClick);
+            this.cmdReadVin.Click += new System.EventHandler(this.ReadVinClick);
             // 
             // txtReadVin
             // 

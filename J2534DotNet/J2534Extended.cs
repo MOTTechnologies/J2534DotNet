@@ -1,5 +1,8 @@
 ﻿#region License
 /* 
+ * Copyright (c) 2016, Roland Harrison
+ * roland.c.harrison@gmail.com
+ *
  * Copyright (c) 2010, Michael Kelly
  * michael.e.kelly@gmail.com
  * http://michael-kelly.com/ 

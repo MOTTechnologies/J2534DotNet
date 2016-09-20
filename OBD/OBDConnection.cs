@@ -1,5 +1,8 @@
-﻿#region Copyright (c) 2010, Michael Kelly
+﻿#region License
 /* 
+ * Copyright (c) 2016, Roland Harrison
+ * roland.c.harrison@gmail.com
+ *
  * Copyright (c) 2010, Michael Kelly
  * michael.e.kelly@gmail.com
  * http://michael-kelly.com/
@@ -39,17 +42,17 @@ namespace OBD
 
     public class OBDConnection : OBDInterface
     {
-        public IJ2534Extended m_j2534Interface;
+        public IJ2534Extended j2534Interface;
         public ProtocolID protocolId;
-        public int m_deviceId;
-        public int m_channelId;
-        public bool m_isConnected;
+        public int deviceId;
+        public int channelId;
+        public bool isConnected;
         public J2534Err m_status;
 
         public OBDConnection(IJ2534Extended j2534Interface)
         {
-            m_j2534Interface = j2534Interface;
-            m_isConnected = false;
+            this.j2534Interface = j2534Interface;
+            isConnected = false;
             protocolId = ProtocolID.ISO15765;
             m_status = J2534Err.STATUS_NOERROR;
         }
@@ -87,12 +90,12 @@ namespace OBD
             if (milliVolts < 5000) milliVolts = 5000;
             if (milliVolts > 20000 && milliVolts != 0xFFFFFFFE && milliVolts != 0xFFFFFFFF) milliVolts = 20000;
 
-            m_status = m_j2534Interface.PassThruSetProgrammingVoltage(m_deviceId, pinNumber, milliVolts);
+            m_status = j2534Interface.PassThruSetProgrammingVoltage(deviceId, pinNumber, milliVolts);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
 
             Thread.Sleep(10);
             int mv = 0;
-            m_status = m_j2534Interface.ReadProgrammingVoltage(m_deviceId, ref mv);
+            m_status = j2534Interface.ReadProgrammingVoltage(deviceId, ref mv);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
             float voltage = ((float)mv) / 1000.0f;
             return voltage;
@@ -101,7 +104,7 @@ namespace OBD
         public float ReadProgrammingVoltage()
         {
             int mv = 0;
-            m_status = m_j2534Interface.ReadProgrammingVoltage(m_deviceId, ref mv);
+            m_status = j2534Interface.ReadProgrammingVoltage(deviceId, ref mv);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
             float voltage = ((float)mv) / 1000.0f;
             return voltage;
@@ -145,7 +148,7 @@ namespace OBD
         public bool GetBatteryVoltage(ref double voltage)
         {
             int millivolts = 0;
-            m_status = m_j2534Interface.ReadBatteryVoltage(m_deviceId, ref millivolts);
+            m_status = j2534Interface.ReadBatteryVoltage(deviceId, ref millivolts);
             if (J2534Err.STATUS_NOERROR == m_status)
             {
                 voltage = millivolts / 1000.0;
@@ -189,10 +192,10 @@ namespace OBD
                     return false;
             }
 
-            m_j2534Interface.ClearRxBuffer(m_channelId);
+            j2534Interface.ClearRxBuffer(channelId);
 
             int numMsgs = 1;
-            m_status = m_j2534Interface.PassThruWriteMsgs(m_channelId, txMsg.ToIntPtr(), ref numMsgs, timeout);
+            m_status = j2534Interface.PassThruWriteMsgs(channelId, txMsg.ToIntPtr(), ref numMsgs, timeout);
             if (J2534Err.STATUS_NOERROR != m_status)
             {
                 return false;
@@ -200,7 +203,7 @@ namespace OBD
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> messages;
-            m_status = m_j2534Interface.ReadAllMessages(m_channelId, 1, timeout * 4, out messages);
+            m_status = j2534Interface.ReadAllMessages(channelId, 1, timeout * 4, out messages);
 
             if (messages.Count <= 0)
             {
@@ -220,24 +223,24 @@ namespace OBD
         /// <returns></returns>
         public void ReadAllMessages(out List<PassThruMsg> messages, int msgNo = 10)
         {
-            m_status = m_j2534Interface.ReadAllMessages(m_channelId, 1, 600, out messages, msgNo);
+            m_status = j2534Interface.ReadAllMessages(channelId, 1, 600, out messages, msgNo);
 
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
         }
 
         public bool IsConnected()
         {
-            return m_isConnected;
+            return isConnected;
         }
 
         public void ConnectISO15765()
         {
-            m_deviceId = 0;
-            m_status = m_j2534Interface.PassThruOpen(IntPtr.Zero, ref m_deviceId);
+            deviceId = 0;
+            m_status = j2534Interface.PassThruOpen(IntPtr.Zero, ref deviceId);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
 
             byte[] value;
-            m_status = m_j2534Interface.PassThruConnect(m_deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref m_channelId);
+            m_status = j2534Interface.PassThruConnect(deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref channelId);
             if (J2534Err.STATUS_NOERROR != m_status) throw new J2534Exception(m_status);
 
             //List<SConfig> configBits = new List<SConfig>();
@@ -263,8 +266,8 @@ namespace OBD
                 PassThruMsg patternMsg = new PassThruMsg(ProtocolID.ISO15765, TxFlag.ISO15765_FRAME_PAD, new byte[] { 0x00, 0x00, 0x07, (byte)(0xE8 + i) });
                 PassThruMsg flowControlMsg = new PassThruMsg(ProtocolID.ISO15765, TxFlag.ISO15765_FRAME_PAD, new byte[] { 0x00, 0x00, 0x07, (byte)(0xE0 + i) });
 
-                m_status = m_j2534Interface.PassThruStartMsgFilter(
-                    m_channelId,
+                m_status = j2534Interface.PassThruStartMsgFilter(
+                    channelId,
                     FilterType.FLOW_CONTROL_FILTER,
                     maskMsg.ToIntPtr(),
                     patternMsg.ToIntPtr(),
@@ -273,7 +276,7 @@ namespace OBD
 
                 if (J2534Err.STATUS_NOERROR != m_status)
                 {
-                    m_j2534Interface.PassThruDisconnect(m_channelId);
+                    j2534Interface.PassThruDisconnect(channelId);
                     throw new J2534Exception(m_status);
                 }
 	        }
@@ -282,7 +285,7 @@ namespace OBD
             ReadObdPid(OBDcmd.Mode.REQUEST_CURRENT_DATA, out value);
             if(value.Length <= 0)
             {
-                m_status = m_j2534Interface.PassThruDisconnect(m_channelId);
+                m_status = j2534Interface.PassThruDisconnect(channelId);
                 throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
             }
 
@@ -292,7 +295,7 @@ namespace OBD
 
         public bool Disconnect()
         {
-            m_status = m_j2534Interface.PassThruClose(m_deviceId);
+            m_status = j2534Interface.PassThruClose(deviceId);
             if (m_status != J2534Err.STATUS_NOERROR)
             {
                 return false;
@@ -334,10 +337,10 @@ namespace OBD
             timeout = 50;
 
 
-            m_j2534Interface.ClearRxBuffer(m_channelId);
+            j2534Interface.ClearRxBuffer(channelId);
 
             var numMsgs = 1;
-            m_status = m_j2534Interface.PassThruWriteMsgs(m_channelId, txMsg.ToIntPtr(), ref numMsgs, timeout);
+            m_status = j2534Interface.PassThruWriteMsgs(channelId, txMsg.ToIntPtr(), ref numMsgs, timeout);
             if (J2534Err.STATUS_NOERROR != m_status) throw new J2534Exception(m_status);
 
         }
