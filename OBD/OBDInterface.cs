@@ -29,6 +29,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
+#endregion
 using J2534DotNet;
 using System;
 using System.Collections.Generic;

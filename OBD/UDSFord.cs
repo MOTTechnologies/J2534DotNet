@@ -22,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
+#endregion
 using J2534DotNet;
 using System;
 using System.Collections.Generic;
@@ -90,7 +91,11 @@ namespace OBD
                 ReadMemoryByAddress(i, out buffer);
 
                 //We recieved an incorrect amount of data, there is no way to handle this error so bubble it back to the user
-                if (buffer.Length != 0x800) throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                if (buffer.Length != 0x800)
+                {
+                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                }
+
                 System.Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
 
                 //Report progress back to the GUI if there is one
@@ -125,13 +130,7 @@ namespace OBD
 
         public void SecurityAccess(byte subFunction)
         {
-            //TODO handle exceptions
-
-            //m_status = m_j2534Interface.PassThruConnect(m_deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref m_channelId);
-
             //Send the security request
-            PassThruMsg txMessage;
-
             byte[] txMsgBytes = {(byte)UDScmd.Mode.SECURITY_ACCESS, subFunction};
             SendMessage(txMsgBytes);
 
@@ -301,7 +300,7 @@ namespace OBD
             bool positiveReponse = false;
             var rxMsgBytes = rxMsg.GetBytes();
             payload = rxMsgBytes;
-
+            int payloadOffset = 1;
             //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
             //If we could use some kind of HEX regex this would be a bit neater
             int stateMachine = 0;
@@ -321,6 +320,8 @@ namespace OBD
                         if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Response.SUCCESS)
                         {
                             //Positive response to the requested mode
+                            //0x23 read memory does not reflect the subfunction in the payload
+                            if (rxMsgBytes[i] == 0x63) payloadOffset = 0;
                             positiveReponse = true;
                         }
                         else if (rxMsgBytes[i] != (byte)OBDcmd.Response.NEGATIVE_RESPONSE)
@@ -334,21 +335,19 @@ namespace OBD
                         if (i + 1 <= rxMsgBytes.Length - 1)
                         {
                             functionResponse = (UDScmd.Response)rxMsgBytes[i + 1];
-                        } else
-                        {
-
-                        }
+                        } 
 
                         //27 01 should respond with either 27 01 xx xx xx 0r 27 02 
                         //if (positiveReponse && rxMsgBytes[i] == txSubFunction)
                         if (positiveReponse)
                         {
+
                             //We have a positive response and a positive subfunction code (subfunction is reflected)
-                            int payloadLength = rxMsgBytes.Length - (i+1);
+                            int payloadLength = rxMsgBytes.Length - (i+ payloadOffset);
                             if (payloadLength > 0)
                             {
                                 payload = new byte[payloadLength];
-                                Array.Copy(rxMsgBytes, i+1, payload, 0, payloadLength);
+                                Array.Copy(rxMsgBytes, i+payloadOffset, payload, 0, payloadLength);
                             }
                             return true;
                         }

@@ -41,6 +41,7 @@
             this.button4 = new System.Windows.Forms.Button();
             this.textBoxVolts = new System.Windows.Forms.TextBox();
             this.button5 = new System.Windows.Forms.Button();
+            this.ignoreProrgammingVoltageCheckBox = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // cmdDetectDevices
@@ -167,11 +168,22 @@
             this.button5.UseVisualStyleBackColor = true;
             this.button5.Click += new System.EventHandler(this.button5_Click);
             // 
+            // ignoreProrgammingVoltageCheckBox
+            // 
+            this.ignoreProrgammingVoltageCheckBox.AutoSize = true;
+            this.ignoreProrgammingVoltageCheckBox.Location = new System.Drawing.Point(174, 275);
+            this.ignoreProrgammingVoltageCheckBox.Name = "ignoreProrgammingVoltageCheckBox";
+            this.ignoreProrgammingVoltageCheckBox.Size = new System.Drawing.Size(204, 17);
+            this.ignoreProrgammingVoltageCheckBox.TabIndex = 13;
+            this.ignoreProrgammingVoltageCheckBox.Text = "Ignore Incorrect Programming Voltage";
+            this.ignoreProrgammingVoltageCheckBox.UseVisualStyleBackColor = true;
+            // 
             // SimpleTest
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(976, 433);
+            this.Controls.Add(this.ignoreProrgammingVoltageCheckBox);
             this.Controls.Add(this.button5);
             this.Controls.Add(this.textBoxVolts);
             this.Controls.Add(this.button4);
@@ -208,6 +220,7 @@
         private System.Windows.Forms.Button button4;
         private System.Windows.Forms.TextBox textBoxVolts;
         private System.Windows.Forms.Button button5;
+        private System.Windows.Forms.CheckBox ignoreProrgammingVoltageCheckBox;
     }
 }
 

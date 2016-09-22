@@ -22,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
+#endregion
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -188,6 +189,10 @@ namespace Sample
             {
                 MessageBox.Show("Error retrieving VIN due to OBD error: " + obdEx.Message);
             }
+            catch (UDSException udsEx)
+            {
+                MessageBox.Show("Error retrieving VIN due to UDS error: " + udsEx.Message);
+            }
             catch (J2534Exception j2534Ex)
             {
                 MessageBox.Show("Error retrieving VIN due to J2534 error: " + j2534Ex.Message);
@@ -233,7 +238,7 @@ namespace Sample
                 return false;
             }
 
-            if (!checkBoxLogJ2534.Checked)
+            if (checkBoxLogJ2534.Checked)
             {
                 j2534Device = new J2534Device();
                 j2534Device.FunctionLibrary = System.IO.Directory.GetCurrentDirectory() + "\\" + "J2534DotNet.Logger.dll";
@@ -243,9 +248,9 @@ namespace Sample
             }
 
             //If there is only one DLL to choose from then load it
-            if (availableJ2534Devices.Count >= 1)
+            if (availableJ2534Devices.Count == 1)
             {
-                return passThru.LoadLibrary(availableJ2534Devices[1]);
+                return passThru.LoadLibrary(availableJ2534Devices[0]);
             }
             else
             {
@@ -257,6 +262,7 @@ namespace Sample
                     return loaded;
                 }
             }
+
             return false;
         }
 
@@ -301,6 +307,7 @@ namespace Sample
         {
             flashReadProgressForm.Close();
             this.Enabled = true;
+            if(flashMemory != null) SaveFile(flashMemory);
         }
 
         private void UpdateFlashReadProgress(object sender, ProgressChangedEventArgs e)
@@ -308,6 +315,7 @@ namespace Sample
             flashReadProgressForm.UpdatePercentage(e.ProgressPercentage);
         }
 
+        byte[] flashMemory;
         void ReadFlash(object sender, DoWorkEventArgs e)
         {
             //ReadFlashMemoryTest(flashReadBW);
@@ -316,13 +324,20 @@ namespace Sample
             try
             {
                 if (!Connect()) return;
+                float voltHigh = 15;
+                float voltLow = 1;
 
+                if(ignoreProrgammingVoltageCheckBox.Checked)
+                {
+                    voltHigh = -1;
+                    voltLow = 1000;
+                }
                 //Ensure the programming voltage is 0v as the PCM needs to see a transition from 0 -> 18v
                 float voltage = comm.ReadProgrammingVoltage();
-                if (voltage > 1)
+                if (voltage > voltLow)
                 {
                     voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 0xFFFFFFFF);
-                    if (voltage > 1)
+                    if (voltage > voltLow)
                     {
                         MessageBox.Show("Failed to set programming voltage (pin 13) to 0 volts, measured: " + voltage + " V");
                         return;
@@ -330,7 +345,7 @@ namespace Sample
                 }
 
                 voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, 18000);
-                if (voltage < 15)
+                if (voltage < voltHigh)
                 {
                     MessageBox.Show("Failed to set programming voltage (pin 13) to 18 volts, measured: " + voltage + " V");
                     return;
@@ -339,7 +354,7 @@ namespace Sample
 
                 //Ensure the programming voltage is still high after an ignition cycle
                 voltage = comm.ReadProgrammingVoltage();
-                if (voltage < 15)
+                if (voltage < voltHigh)
                 {
                     MessageBox.Show("Programming voltage did not persist after ignition power cycle), measured: " + voltage + " V");
                     return;
@@ -349,24 +364,24 @@ namespace Sample
                 //Enter level 1 seecurity mode
                 comm.SecurityAccess(0x01);
 
-                byte[] memory = comm.ReadFlashMemory(flashReadBW);
-
-
-                SaveFile(memory);
-
+                flashMemory = comm.ReadFlashMemory(flashReadBW);
 
             }
             catch (OBDException obdEx)
             {
-                MessageBox.Show("Error entering security level due to OBD error: " + obdEx.Message);
+                MessageBox.Show("Error entering reading flash due to OBD error: " + obdEx.Message, "Error", MessageBoxButtons.OK,MessageBoxIcon.Asterisk);
+            }
+            catch (UDSException udsEx)
+            {
+                MessageBox.Show("Error entering reading flash due to UDS error: " + udsEx.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
             catch (J2534Exception j2534Ex)
             {
-                MessageBox.Show("Error entering security level due to J2534 error: " + j2534Ex.Message);
+                MessageBox.Show("Error entering security level due to J2534 error: " + j2534Ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Unknown error occured whilst entering security level: " + ex.Message);
+                MessageBox.Show("Unknown error occured whilst entering security level: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
             finally
             {
@@ -431,11 +446,7 @@ namespace Sample
         {
             try
             {
-                if (!LoadJ2534())
-                {
-                    UpdateLog("Failed to load J2534 library");
-                    return;
-                }
+                if (!Connect()) return;
 
                 if (comm == null) comm = new UDSFord(passThru);
 
@@ -458,15 +469,25 @@ namespace Sample
                 }
 
             }
+            catch (OBDException obdEx)
+            {
+                MessageBox.Show("Error setting voltage due to OBD error: " + obdEx.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+            }
+            catch (UDSException udsEx)
+            {
+                MessageBox.Show("Error setting voltage due to UDS error: " + udsEx.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+            }
             catch (J2534Exception j2534Ex)
             {
-                UpdateLog("Error Setting Voltage due to J2534 error: " + j2534Ex.Message);
-                MessageBox.Show("Error Setting Voltage due to J2534 error: " + j2534Ex.Message);
+                MessageBox.Show("Error setting voltage due to J2534 error: " + j2534Ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             }
             catch (Exception ex)
             {
-                UpdateLog("Unknown Error Occured Whilst Setting Voltage: " + ex.Message);
-                MessageBox.Show("Unknown Error Occured Whilst Setting Voltage : " + ex.Message);
+                MessageBox.Show("Unknown error setting voltage: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+            }
+            finally
+            {
+                Disconnect();
             }
         }
 
