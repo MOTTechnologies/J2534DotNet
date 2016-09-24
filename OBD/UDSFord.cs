@@ -30,6 +30,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 
 namespace OBD
 {
@@ -86,43 +87,126 @@ namespace OBD
         {
             byte[] flashMemory = new byte[0x100000];
             byte[] buffer;
-            for (uint i = 0x0; i <= 0xFF800; i+= 0x800)
+            uint blockSize = 0x800; //This is the largest size we can request
+            for (uint i = 0x0; i <= 0xFF800; i+= blockSize)
             {
-                ReadMemoryByAddress(i, out buffer);
+                ReadMemoryByAddress(i, blockSize, out buffer);
 
                 //We recieved an incorrect amount of data, there is no way to handle this error so bubble it back to the user
-                if (buffer.Length != 0x800)
-                {
-                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
-                }
+                if (buffer.Length != blockSize) throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT); 
 
-                System.Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
+                Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
 
                 //Report progress back to the GUI if there is one
                 if (progressReporter != null) progressReporter.ReportProgress((int)((float)i / (float)0xFF800 * 100.0f));
-
             }
             return flashMemory;
         }
 
-        public void ReadMemoryByAddress(long address, out byte[] memory)
+        //This is used to erase the flash
+        public bool DiagnosticCommand()
         {
-            //Send the read memory request
-
-            byte[] txMsgBytes = { (byte)UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, (byte)((address >> 16) & 0xFF), (byte)((address >> 8) & 0xFF), (byte)((address) & 0xFF), 0x08,0 };
+            //Non Standard Manafacturer Specific Mode EraseFlash (Ford Spanish Oak)
+            //byte1 ServiceID 0xB1
+            //byte2 AddressAndLengthFormatIdentifier (0x00 for Ford Spanish Oak)
+            //byte3 0xB2 magic byte 1
+            //byte4 0xAA
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.DIAGNOSTIC_COMMAND, 0x00, 0xB2, 0xAA};
             SendMessage(txMsgBytes);
 
-            //Attempt to read at least 1 message as a reply
             List<PassThruMsg> rxMsgs;
-            ReadAllMessages(out rxMsgs,1);
+            ReadAllMessages(out rxMsgs, 1, 1000, true);
 
-            //Find the start of the response and parse it.
-            PassThruMsg memoryResponse;
+            //Expect back 0x7F B1 78  (78=Response Pending)
+            //0xF1 00 B2  which is success
+            return false
+        }
+
+        public bool RequestDownload()
+        {
+            //ISO14229 RequestDownload
+            //byte1 ServiceID 0x34
+            //byte2 DataFormatIdentifier 
+            //      High nibble = memorySize)
+            //      Low nibble  = memoryAddress
+            //byte3 AddressAndLengthFormatIdentifier (0x01 for Ford Spanish Oak)
+            //byte4 memoryAddressByte1
+            //byte5 memoryAddressByte2
+            //byte6 memoryAddressByte3
+            //byte7 uncompressedMemorySizeByte1
+            //byte8 uncompressedMemorySizeByte1
+            //byte9 uncompressedMemorySizeByte1
+
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.REQUEST_DOWNLOAD, 0x00, 0x01, 0x00,00,00,00,0x30,00};
+            SendMessage(txMsgBytes);
+
+            //We expect 3 messages, rx, start of message, then the payload data
+            List<PassThruMsg> rxMsgs;
+
+            ReadAllMessages(out rxMsgs, 1, 100, true);
+            foreach(var msg in rxMsgs)
+            {
+                var bytes = msg.GetBytes();
+            }
+
+            //0x78 response pending is a normal response
+            //0x
+
+            //This will throw an exception if we don't get a valid reply
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                var result = rxMsgs[0].GetBytes();
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+            }
+
+            //If we couldn't find the start of the mesage give up
+            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            PassThruMsg memoryResponse = rxMsgs[0];
             UDScmd.Response subFunctionResponse;
-            int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
-            if (startOfMessageIndex == -1) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
-            memoryResponse = rxMsgs[startOfMessageIndex];
+            byte[] payload;
+            if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out payload))
+            {
+                throw new UDSException(subFunctionResponse);
+            }
+            return true;
 
+            throw new NotImplementedException();
+        }
+
+        public void ReadMemoryByAddress(uint address, uint blockSize, out byte[] memory)
+        {
+            //Send the read memory request
+            byte blockSizeUpper = (byte)((blockSize >> 8) & 0xFF);
+            byte blockSizeLower = (byte)(blockSize & 0xFF);
+            //ISO14229 ReadMemoryByAddress
+            //byte1 ServiceID 0x23
+            //byte2 AddressAndLengthFormatIdentifier (0 for Ford Spanish Oak)
+            //byte3 address byte 1
+            //byte4 address byte 2
+            //byte5 address byte 3
+            //byte6 address byte 4
+            //byte7 block size byte1
+            //byte8 block size byte2
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, (byte)((address >> 16) & 0xFF), (byte)((address >> 8) & 0xFF), (byte)((address) & 0xFF), blockSizeUpper, blockSizeLower};
+            SendMessage(txMsgBytes);
+
+            //We expect 3 messages, rx, start of message, then the payload data
+            List<PassThruMsg> rxMsgs;
+
+            //This will throw an exception if we don't get a valid reply
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+            }
+
+            //If we couldn't find the start of the mesage give up
+            if(m_status !=  J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            PassThruMsg memoryResponse = rxMsgs[0];
+            UDScmd.Response subFunctionResponse;
             if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out memory)) {
                 throw new UDSException(subFunctionResponse);
             }
@@ -136,7 +220,7 @@ namespace OBD
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> rxMsgs;
-            ReadAllMessages(out rxMsgs);
+            ReadAllMessages(out rxMsgs,1, 200);
 
             //Find the start of the response and parse it.
             byte[] payload;
@@ -178,13 +262,12 @@ namespace OBD
                     var seedresponse = CalculateResponseFromSeed(0x7E0, subFunction, payload);
 
                     txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
-                    //txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
 
                     PassThruMsg txMsg;
                     SendMessage(txMsgBytes);
 
                     //Attempt to read at least 1 message as a reply
-                    ReadAllMessages(out rxMsgs);
+                    ReadAllMessages(out rxMsgs,1,200);
 
                     //Get the response
                     startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
@@ -277,10 +360,7 @@ namespace OBD
             throw new NotImplementedException();
         }
 
-        public bool RequestDownload()
-        {
-            throw new NotImplementedException();
-        }
+
 
         public bool RequestUpload()
         {

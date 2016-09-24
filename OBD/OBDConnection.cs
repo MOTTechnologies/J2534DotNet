@@ -48,6 +48,7 @@ namespace OBD
         public int channelId;
         public bool isConnected;
         public J2534Err m_status;
+        int _defaultTimeout = 60;
 
         public OBDConnection(IJ2534Extended j2534Interface)
         {
@@ -84,20 +85,21 @@ namespace OBD
         }
 
 
-        public float PassThruSetProgrammingVoltage(PinNumber pinNumber, uint milliVolts)
+        public float PassThruSetProgrammingVoltage(PinNumber pinNumber, PinVoltage mv)
         {
+            uint milliVolts = (uint)mv;
 
             if (milliVolts < 5000) milliVolts = 5000;
-            if (milliVolts > 20000 && milliVolts != 0xFFFFFFFE && milliVolts != 0xFFFFFFFF) milliVolts = 20000;
+            if (milliVolts > 20000 && mv != PinVoltage.VOLTAGE_OFF && mv != PinVoltage.SHORT_TO_GROUND) milliVolts = 20000;
 
             m_status = j2534Interface.PassThruSetProgrammingVoltage(deviceId, pinNumber, milliVolts);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
 
             Thread.Sleep(10);
-            int mv = 0;
-            m_status = j2534Interface.ReadProgrammingVoltage(deviceId, ref mv);
+            int mvActual = 0;
+            m_status = j2534Interface.ReadProgrammingVoltage(deviceId, ref mvActual);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
-            float voltage = ((float)mv) / 1000.0f;
+            float voltage = ((float)mvActual);
             return voltage;
         }
 
@@ -106,7 +108,7 @@ namespace OBD
             int mv = 0;
             m_status = j2534Interface.ReadProgrammingVoltage(deviceId, ref mv);
             if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
-            float voltage = ((float)mv) / 1000.0f;
+            float voltage = ((float)mv);
             return voltage;
         }
 
@@ -162,6 +164,7 @@ namespace OBD
             string vin = "";
             byte[] value;
             ReadObdPid(OBDcmd.Mode.REQUEST_VEHICLE_INFORMATION, out value, (byte)PID.VehicleInformation.VIN);
+            if (value.Length <= 0) return "";
             var vinArray = new byte[value.Length - 1];
             Array.Copy(value, 1, vinArray, 0, value.Length - 1);
             if (value.Length > 0) vin = Encoding.ASCII.GetString(vinArray.ToArray());
@@ -203,7 +206,7 @@ namespace OBD
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> messages;
-            m_status = j2534Interface.ReadAllMessages(channelId, 1, timeout * 4, out messages);
+            m_status = j2534Interface.ReadAllMessages(channelId, 1, _defaultTimeout, out messages, true);
 
             if (messages.Count <= 0)
             {
@@ -221,11 +224,30 @@ namespace OBD
         /// </summary>
         /// <param name="replyBytes"></param>
         /// <returns></returns>
-        public void ReadAllMessages(out List<PassThruMsg> messages, int msgNo = 10)
+        public J2534Err ReadMessage(out List<PassThruMsg> messages, int timeout)
         {
-            m_status = j2534Interface.ReadAllMessages(channelId, 1, 600, out messages, msgNo);
+            m_status = j2534Interface.ReadAllMessages(channelId, 1, timeout, out messages, false);
+            return m_status;
+        }
 
-            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
+        /// <summary>
+        /// Returns a list of byte arrays with the tX messages
+        /// </summary>
+        /// <param name="replyBytes"></param>
+        /// <returns></returns>
+        public void ReadAllMessages(out List<PassThruMsg> messages, int numMsgs, int timeout, bool readUntilTimeout = true)
+        {
+            m_status = j2534Interface.ReadAllMessages(channelId, numMsgs, timeout, out messages, readUntilTimeout);
+
+            if (m_status != J2534Err.STATUS_NOERROR)
+            {
+                throw new J2534Exception(m_status);
+            }
+            else
+            {
+                if (messages.Count < numMsgs) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
+            }
+
         }
 
         public bool IsConnected()
@@ -233,11 +255,19 @@ namespace OBD
             return isConnected;
         }
 
-        public void ConnectISO15765()
+        public void Connect()
         {
             deviceId = 0;
             m_status = j2534Interface.PassThruOpen(IntPtr.Zero, ref deviceId);
-            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
+            if (m_status != J2534Err.STATUS_NOERROR)
+            {
+                throw new J2534Exception(m_status);
+            }
+        }
+
+        public void ConnectISO15765()
+        {
+            Connect();
 
             byte[] value;
             m_status = j2534Interface.PassThruConnect(deviceId, ProtocolID.ISO15765, ConnectFlag.NONE, BaudRate.ISO15765, ref channelId);
@@ -285,8 +315,8 @@ namespace OBD
             ReadObdPid(OBDcmd.Mode.REQUEST_CURRENT_DATA, out value);
             if(value.Length <= 0)
             {
-                m_status = j2534Interface.PassThruDisconnect(channelId);
-                throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
+                //m_status = j2534Interface.PassThruDisconnect(channelId);
+                //throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
             }
 
             protocolId = ProtocolID.ISO15765;
@@ -348,7 +378,6 @@ namespace OBD
         public void ReadObdPid(OBDcmd.Mode mode, out byte[] payload, byte pid = 0)
         {
             // See here for more details on this PID mode https://en.wikipedia.org/wiki/OBD-II_PIDs#Mode_1_PID_00
-            int timeout = 50;
             payload = new byte[0];
             byte[] txMsgBytes;
 
@@ -359,7 +388,7 @@ namespace OBD
 
             //Attempt to read at least 1 message as a reply
             List<PassThruMsg> messages;
-            ReadAllMessages(out messages);
+            ReadAllMessages(out messages,1, 200);
 
             //bubble the error back to the user
             if (messages.Count <= 0) throw new J2534Exception(J2534Err.ERR_BUFFER_EMPTY);
@@ -372,7 +401,10 @@ namespace OBD
             ////Typical tx/rx response
             ////0x07 DF 09 02 (request VIN)
             ////0x07 E8 49 02 01 xx xx xx xx
-            if (!ParseOBDResponse(messages[index], mode, out payload, pid)) throw new OBDException(OBDcmd.Response.NEGATIVE_RESPONSE);
+            if (!ParseOBDResponse(messages[index], mode, out payload, pid))
+            {
+                throw new OBDException(OBDcmd.Response.INVALID_RESPONSE);
+            }
 
         }
 
@@ -434,7 +466,17 @@ namespace OBD
 
         public int GetStartOfMessageIndex(List<PassThruMsg> rxMsgs)
         {
-            for (int i = 0; i < rxMsgs.Count; i++) if (rxMsgs[i].RxStatus == RxStatus.NONE) return i;
+            //We get a TX_INDICATION || START_OF_MESSAGE before the payload message which is type NONE
+            for (int i = 0; i < rxMsgs.Count; i++)
+            {
+                if (rxMsgs[i].RxStatus == RxStatus.NONE) return i;
+
+                if (rxMsgs[i].RxStatus == RxStatus.START_OF_MESSAGE)
+                {
+                    if (i + 1 > rxMsgs.Count - 1) return -1;
+                    return i+1;
+                }
+            }
             return -1;
 
         }

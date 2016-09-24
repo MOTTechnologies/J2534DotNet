@@ -72,16 +72,27 @@ namespace OBD
 
     public class OBDException : Exception
     {
+        OBDcmd.Response _response;
+        public OBDcmd.Response Reponse
+        {
+            get { return _response; }
+        }
         public OBDException(OBDcmd.Response response) : base(Exceptions.GetDescription(response))
         {
+            _response = response;
         }
     }
 
     public class UDSException : Exception
     {
+        UDScmd.Response _response;
+        public UDScmd.Response Reponse
+        {
+            get { return _response; }
+        }
         public UDSException(UDScmd.Response response) : base(Exceptions.GetDescription(response))
         {
-
+            _response = response;
         }
     }
 }

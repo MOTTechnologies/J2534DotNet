@@ -25,6 +25,7 @@ namespace OBD
         {
             SUCCESS = 0x40,
             NEGATIVE_RESPONSE = 0x7F,
+            INVALID_RESPONSE = 0xFE,
             UNKNOWN = 0xFF
             
         }
