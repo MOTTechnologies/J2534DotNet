@@ -119,7 +119,7 @@ namespace OBD
 
             //Expect back 0x7F B1 78  (78=Response Pending)
             //0xF1 00 B2  which is success
-            return false
+            return false;
         }
 
         public bool RequestDownload()
