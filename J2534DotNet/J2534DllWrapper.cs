@@ -28,6 +28,7 @@
  */
 #endregion License
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace J2534DotNet
@@ -143,6 +144,12 @@ namespace J2534DotNet
 
         public bool LoadJ2534Library(string path)
         {
+            //this DLL does not play nice and causes a loaderlock
+            //TODO fix this properly
+            string p = Path.GetFileName(path);
+            if (p.Contains("BVTX4J32.dll")) {
+                return false;
+            }
             m_pDll = NativeMethods.LoadLibrary(path);
 
             if (m_pDll == IntPtr.Zero)
@@ -272,7 +279,8 @@ namespace J2534DotNet
 
         public bool FreeLibrary()
         {
-            return NativeMethods.FreeLibrary(m_pDll);
+            if(m_pDll != null) NativeMethods.FreeLibrary(m_pDll);
+            return false;
         }
     }
 }

@@ -85,12 +85,12 @@ namespace OBD
 
     public class UDSException : Exception
     {
-        UDScmd.Response _response;
-        public UDScmd.Response Reponse
+        UDScmd.NegativeResponse _response;
+        public UDScmd.NegativeResponse Reponse
         {
             get { return _response; }
         }
-        public UDSException(UDScmd.Response response) : base(Exceptions.GetDescription(response))
+        public UDSException(UDScmd.NegativeResponse response) : base(Exceptions.GetDescription(response))
         {
             _response = response;
         }

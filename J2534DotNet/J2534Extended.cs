@@ -211,25 +211,33 @@ namespace J2534DotNet
         /// <param name="numMsgs"></param>
         /// <param name="timeout"></param>
         /// <returns></returns>
-        public J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, int max = 1000)
+        public J2534Err ReadAllMessages(int channelId, int numMsgs, int timeout, out List<PassThruMsg> messages, bool readUntilTimeout = true)
         {
             messages = new List<PassThruMsg>();
 
             IntPtr rxMsgs = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(PassThruMsg)) * numMsgs);
             var m_status = J2534Err.STATUS_NOERROR;
             var m_status2 = J2534Err.STATUS_NOERROR;
-            int count = 0;
 
+            //Read the first block of messages
             m_status = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
-
-            //If we didn't get a single reply return the error code
-            if (m_status != J2534Err.STATUS_NOERROR)
+            if (m_status == J2534Err.STATUS_NOERROR)
             {
+                var msgs = rxMsgs.AsMsgList(numMsgs);
+                if (msgs.Count > 0) messages.AddRange(msgs);
+
+                //If we are only reading this block then return now
+                if (!readUntilTimeout) return m_status;
+            }
+            else
+            {
+                var msgs = rxMsgs.AsMsgList(numMsgs);
+                if (msgs.Count > 0) messages.AddRange(msgs);
+                //If we failed on the first read give up now
                 return m_status;
             }
-            messages.AddRange(rxMsgs.AsMsgList(numMsgs));
 
-            m_status2 = m_status;
+            //We successfully read one block, now keep going
             while (J2534Err.STATUS_NOERROR == m_status2)
             {
                 m_status2 = PassThruReadMsgs(channelId, rxMsgs, ref numMsgs, timeout);
@@ -238,8 +246,10 @@ namespace J2534DotNet
                     var msgs = rxMsgs.AsMsgList(numMsgs);
                     foreach (var msg in msgs) messages.Add(msg);
                 }
-                count++;
-                if (count > max) break;
+                else
+                {
+                    break;
+                }
             }
 
             return J2534Err.STATUS_NOERROR;
@@ -250,9 +260,14 @@ namespace J2534DotNet
 
     public class J2534Exception : Exception
     {
+        J2534Err _error;
+        public J2534Err Error
+        {
+            get { return _error; }
+        }
         public J2534Exception(J2534Err error) : base(error.ToString())
         {
-
+            _error = error;
         }
     }
 }

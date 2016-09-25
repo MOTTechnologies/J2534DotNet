@@ -32,7 +32,8 @@ namespace J2534DotNet.Logger
                 {
                     j2534Device = sd.Device;
 
-                } else
+                }
+                else
                 {
                     return;
                 }

@@ -119,6 +119,13 @@ namespace J2534DotNet
         PIN_15 = 15
     }
 
+    public enum PinVoltage : uint
+    {
+        FEPS_VOLTAGE = 18000,
+        SHORT_TO_GROUND = 0xFFFFFFFE,
+        VOLTAGE_OFF = 0xFFFFFFFF
+    }
+
     public enum FilterType
     {
         PASS_FILTER = 0x01,

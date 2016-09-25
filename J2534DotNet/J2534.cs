@@ -41,6 +41,15 @@ namespace J2534DotNet
                 return _IsLoaded;
             }
         }
+
+        public string DeviceName
+        {
+            get
+            {
+                return m_device.Name;
+            }
+        }
+
         public bool LoadLibrary(J2534Device device)
         {
             try {

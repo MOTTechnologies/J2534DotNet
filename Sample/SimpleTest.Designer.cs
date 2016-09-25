@@ -42,6 +42,8 @@
             this.textBoxVolts = new System.Windows.Forms.TextBox();
             this.button5 = new System.Windows.Forms.Button();
             this.ignoreProrgammingVoltageCheckBox = new System.Windows.Forms.CheckBox();
+            this.autoDetectCheckBox = new System.Windows.Forms.CheckBox();
+            this.button6 = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // cmdDetectDevices
@@ -105,7 +107,6 @@
             this.button1.TabIndex = 6;
             this.button1.Text = "Send Recieve Test";
             this.button1.UseVisualStyleBackColor = true;
-            this.button1.Click += new System.EventHandler(this.SendReceiveNoErrorChecking);
             // 
             // button2
             // 
@@ -120,8 +121,6 @@
             // checkBoxLogJ2534
             // 
             this.checkBoxLogJ2534.AutoSize = true;
-            this.checkBoxLogJ2534.Checked = true;
-            this.checkBoxLogJ2534.CheckState = System.Windows.Forms.CheckState.Checked;
             this.checkBoxLogJ2534.Location = new System.Drawing.Point(13, 43);
             this.checkBoxLogJ2534.Name = "checkBoxLogJ2534";
             this.checkBoxLogJ2534.Size = new System.Drawing.Size(120, 17);
@@ -136,9 +135,9 @@
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(155, 23);
             this.button3.TabIndex = 9;
-            this.button3.Text = "Security Access Level 2";
+            this.button3.Text = "Request Download";
             this.button3.UseVisualStyleBackColor = true;
-            this.button3.Click += new System.EventHandler(this.button3_Click);
+            this.button3.Click += new System.EventHandler(this.RequestDownload_Click);
             // 
             // button4
             // 
@@ -166,7 +165,7 @@
             this.button5.TabIndex = 12;
             this.button5.Text = "Disable Pin 13";
             this.button5.UseVisualStyleBackColor = true;
-            this.button5.Click += new System.EventHandler(this.button5_Click);
+            this.button5.Click += new System.EventHandler(this.SetVoltage_Click);
             // 
             // ignoreProrgammingVoltageCheckBox
             // 
@@ -178,11 +177,35 @@
             this.ignoreProrgammingVoltageCheckBox.Text = "Ignore Incorrect Programming Voltage";
             this.ignoreProrgammingVoltageCheckBox.UseVisualStyleBackColor = true;
             // 
+            // autoDetectCheckBox
+            // 
+            this.autoDetectCheckBox.AutoSize = true;
+            this.autoDetectCheckBox.Checked = true;
+            this.autoDetectCheckBox.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.autoDetectCheckBox.Location = new System.Drawing.Point(12, 66);
+            this.autoDetectCheckBox.Name = "autoDetectCheckBox";
+            this.autoDetectCheckBox.Size = new System.Drawing.Size(83, 17);
+            this.autoDetectCheckBox.TabIndex = 14;
+            this.autoDetectCheckBox.Text = "Auto Detect";
+            this.autoDetectCheckBox.UseVisualStyleBackColor = true;
+            // 
+            // button6
+            // 
+            this.button6.Location = new System.Drawing.Point(12, 89);
+            this.button6.Name = "button6";
+            this.button6.Size = new System.Drawing.Size(155, 23);
+            this.button6.TabIndex = 15;
+            this.button6.Text = "Change J2534 Device";
+            this.button6.UseVisualStyleBackColor = true;
+            this.button6.Click += new System.EventHandler(this.ChangeDevice_Click);
+            // 
             // SimpleTest
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(976, 433);
+            this.Controls.Add(this.button6);
+            this.Controls.Add(this.autoDetectCheckBox);
             this.Controls.Add(this.ignoreProrgammingVoltageCheckBox);
             this.Controls.Add(this.button5);
             this.Controls.Add(this.textBoxVolts);
@@ -221,6 +244,8 @@
         private System.Windows.Forms.TextBox textBoxVolts;
         private System.Windows.Forms.Button button5;
         private System.Windows.Forms.CheckBox ignoreProrgammingVoltageCheckBox;
+        private System.Windows.Forms.CheckBox autoDetectCheckBox;
+        private System.Windows.Forms.Button button6;
     }
 }
 

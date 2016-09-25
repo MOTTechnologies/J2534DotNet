@@ -87,13 +87,13 @@ namespace OBD
         {
             byte[] flashMemory = new byte[0x100000];
             byte[] buffer;
-            uint blockSize = 0x800; //This is the largest size we can request
+            uint blockSize = 0x800; //This is the largest size we can request that is an even divisible number, 0x900 is supported but then we need an odd request at the end
             for (uint i = 0x0; i <= 0xFF800; i+= blockSize)
             {
                 ReadMemoryByAddress(i, blockSize, out buffer);
 
                 //We recieved an incorrect amount of data, there is no way to handle this error so bubble it back to the user
-                if (buffer.Length != blockSize) throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT); 
+                if (buffer.Length != blockSize) throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT); 
 
                 Buffer.BlockCopy(buffer, 0, flashMemory, (int)i, buffer.Length);
 
@@ -104,7 +104,7 @@ namespace OBD
         }
 
         //This is used to erase the flash
-        public bool DiagnosticCommand()
+        public void EraseFlash()
         {
             //Non Standard Manafacturer Specific Mode EraseFlash (Ford Spanish Oak)
             //byte1 ServiceID 0xB1
@@ -119,10 +119,9 @@ namespace OBD
 
             //Expect back 0x7F B1 78  (78=Response Pending)
             //0xF1 00 B2  which is success
-            return false;
         }
 
-        public bool RequestDownload()
+        public void RequestDownload()
         {
             //ISO14229 RequestDownload
             //byte1 ServiceID 0x34
@@ -140,39 +139,26 @@ namespace OBD
             byte[] txMsgBytes = { (byte)UDScmd.Mode.REQUEST_DOWNLOAD, 0x00, 0x01, 0x00,00,00,00,0x30,00};
             SendMessage(txMsgBytes);
 
-            //We expect 3 messages, rx, start of message, then the payload data
+            //We expect 3 messages, rx, start of message, 0x78 (response pending) then the successful response
             List<PassThruMsg> rxMsgs;
 
             ReadAllMessages(out rxMsgs, 1, 100, true);
-            foreach(var msg in rxMsgs)
-            {
-                var bytes = msg.GetBytes();
-            }
 
-            //0x78 response pending is a normal response
-            //0x
+            //UDScmd.NegativeResponse subFunctionResponse = UDScmd.NegativeResponse.UNKNOWN;
+            //byte[] payload;
+            //bool success = false;
+            //foreach(var msg in rxMsgs)
+            //{
+            //    UDSPacket rxPacket = ParseUDSResponse(msg, UDScmd.Mode.REQUEST_DOWNLOAD);
 
-            //This will throw an exception if we don't get a valid reply
-            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
-            {
-                var result = rxMsgs[0].GetBytes();
-                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
-            }
+            //        success = true;
+            //        break;
+            //    }
+            //}
 
-            //If we couldn't find the start of the mesage give up
-            if (m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
-            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+            ////Bubble the last subFunctionError back to the user
+            //if (!success) throw new UDSException(subFunctionResponse);
 
-            PassThruMsg memoryResponse = rxMsgs[0];
-            UDScmd.Response subFunctionResponse;
-            byte[] payload;
-            if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out payload))
-            {
-                throw new UDSException(subFunctionResponse);
-            }
-            return true;
-
-            throw new NotImplementedException();
         }
 
         public void ReadMemoryByAddress(uint address, uint blockSize, out byte[] memory)
@@ -202,14 +188,14 @@ namespace OBD
             }
 
             //If we couldn't find the start of the mesage give up
-            if(m_status !=  J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+            if(m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
             if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
 
-            PassThruMsg memoryResponse = rxMsgs[0];
-            UDScmd.Response subFunctionResponse;
-            if (!ParseUDSResponse(memoryResponse, UDScmd.Mode.READ_MEMORY_BY_ADDRESS, 0, out subFunctionResponse, out memory)) {
-                throw new UDSException(subFunctionResponse);
+            UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.READ_MEMORY_BY_ADDRESS);
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESONSE) {
+                throw new UDSException(rxPacket.NegativeResponse);
             }
+            memory = rxPacket.Payload;
         }
 
         public void SecurityAccess(byte subFunction)
@@ -223,8 +209,6 @@ namespace OBD
             ReadAllMessages(out rxMsgs,1, 200);
 
             //Find the start of the response and parse it.
-            byte[] payload;
-            UDScmd.Response subFunctionResponse;
             PassThruMsg seedKeyResponse;
             int startOfMessageIndex = GetStartOfMessageIndex(rxMsgs);
 
@@ -235,35 +219,39 @@ namespace OBD
             //response is 00 00 7F 27 12 if you have just powered on and had VPP during power on but the command is incorrect length (unsupported)
             //response is 00 00 7F 27 11 if you have no VPP 
             //response is 00 07 E8 67 mode XX XX XX if success
-            if (!ParseUDSResponse(seedKeyResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload))
+            UDSPacket rxPacket = ParseUDSResponse(seedKeyResponse, UDScmd.Mode.SECURITY_ACCESS);
+            if (rxPacket.Response == UDScmd.Response.NO_RESPONSE)
             {
+                throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT);
+            }
+            else if (rxPacket.Response == UDScmd.Response.NEGATIVE_RESPONSE)
+            { 
                 //Inform the user of the error
-                if(subFunctionResponse == UDScmd.Response.UNKNOWN)
+                if(rxPacket.NegativeResponse == UDScmd.NegativeResponse.UNKNOWN)
                 {
                     //no error code supplied, something else went wrong
-                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                    throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT);
                 }
                 else
                 {
                     //We got a sub function error code
-                    throw new UDSException(subFunctionResponse);
+                    throw new UDSException(rxPacket.NegativeResponse);
                 }
             }
             else
             {
-                if (payload.Length < 3)
+                if (rxPacket.Payload.Length < 3)
                 {
                     //Incorrect seed response length
-                    throw new UDSException(UDScmd.Response.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                    throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT);
                 }
                 else
                 {
                     //Calculate the seed response
-                    var seedresponse = CalculateResponseFromSeed(0x7E0, subFunction, payload);
+                    var seedresponse = CalculateResponseFromSeed(0x7E0, subFunction, rxPacket.Payload);
 
+                    //Send the packet
                     txMsgBytes = new byte[] { (byte)UDScmd.Mode.SECURITY_ACCESS, (byte)(subFunction + 1), (byte)((seedresponse >> 16) & 0xFF), (byte)((seedresponse >> 8) & 0xFF), (byte)((seedresponse) & 0xFF) };
-
-                    PassThruMsg txMsg;
                     SendMessage(txMsgBytes);
 
                     //Attempt to read at least 1 message as a reply
@@ -275,12 +263,30 @@ namespace OBD
 
                     var unlockResponse = rxMsgs[startOfMessageIndex];
                     //needs to be 00 00 07 E8 67 04 (mode+1)  (or 67 02)
-                    var b = unlockResponse.GetBytes();
-                    byte[] payload2;
-                    if (!ParseUDSResponse(unlockResponse, UDScmd.Mode.SECURITY_ACCESS, subFunction, out subFunctionResponse, out payload2))
+
+                    rxPacket = ParseUDSResponse(unlockResponse, UDScmd.Mode.SECURITY_ACCESS);
+                    if (rxPacket.Response == UDScmd.Response.NO_RESPONSE)
+                    {
+                        throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                    }
+                    else if (rxPacket.Response == UDScmd.Response.NEGATIVE_RESPONSE)
                     {
                         //Inform the user of the error
-                        throw new UDSException(subFunctionResponse);
+                        if (rxPacket.NegativeResponse == UDScmd.NegativeResponse.UNKNOWN)
+                        {
+                            //no error code supplied, something else went wrong
+                            throw new UDSException(UDScmd.NegativeResponse.INCORRECT_MSG_LENGTH_OR_FORMAT);
+                        }
+                        else
+                        {
+                            //We got a sub function error code
+                            throw new UDSException(rxPacket.NegativeResponse);
+                        }
+                    }
+
+                    if(rxPacket.SubFunction != subFunction + 1)
+                    {
+                        throw new Exception($"Returned an incorrect subfunction code, expected {subFunction+1} got {rxPacket.SubFunction}");
                     }
 
                     //We successfully entered the serurity level!
@@ -289,8 +295,6 @@ namespace OBD
             }
 
         }
-
-
 
         /// <summary>
         /// This routine was developed from "FordStuff.py" written by Chris Valasek and Charlie Miller
@@ -350,19 +354,19 @@ namespace OBD
             return key;
         }
 
-        public bool ECUReset(byte[] command)
+        public void ECUReset(byte[] command)
         {
             throw new NotImplementedException();
         }
 
-        public bool ClearDiagnosticInformation(byte[] command)
+        public void ClearDiagnosticInformation(byte[] command)
         {
             throw new NotImplementedException();
         }
 
 
 
-        public bool RequestUpload()
+        public void RequestUpload()
         {
             throw new NotImplementedException();
         }
@@ -374,13 +378,10 @@ namespace OBD
         /// <param name="txMode"></param>
         /// <param name="payload"></param>
         /// <returns></returns>
-        bool ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode, byte txSubFunction, out UDScmd.Response functionResponse, out byte[] payload)
+        UDSPacket ParseUDSResponse(PassThruMsg rxMsg, UDScmd.Mode txMode)
         {
-            functionResponse = UDScmd.Response.UNKNOWN;
-            bool positiveReponse = false;
             var rxMsgBytes = rxMsg.GetBytes();
-            payload = rxMsgBytes;
-            int payloadOffset = 1;
+            UDSPacket rxPacket = new UDSPacket();
             //Iterate the reply bytes to find the echod ECU index, response code, function response and payload data if there is any
             //If we could use some kind of HEX regex this would be a bit neater
             int stateMachine = 0;
@@ -390,58 +391,91 @@ namespace OBD
                 {
                     case 0:
                         if (rxMsgBytes[i] == 0x07) stateMachine = 1;
-                        else if (rxMsgBytes[i] != 0) return false;
+                        else if (rxMsgBytes[i] != 0) return rxPacket;
                         break;
                     case 1:
                         if (rxMsgBytes[i] == 0xE8) stateMachine = 2;
-                        else return false;
+                        else return rxPacket;
                         break;
                     case 2:
-                        if (rxMsgBytes[i] == (byte)txMode + (byte)OBDcmd.Response.SUCCESS)
+                        var payload = new byte[rxMsgBytes.Length - i];
+
+                        int payloadLength = rxMsgBytes.Length - i;
+                        if (payloadLength > 0)
                         {
-                            //Positive response to the requested mode
-                            //0x23 read memory does not reflect the subfunction in the payload
-                            if (rxMsgBytes[i] == 0x63) payloadOffset = 0;
-                            positiveReponse = true;
+                            payload = new byte[payloadLength];
+                            Array.Copy(rxMsgBytes, i, payload, 0, payloadLength);
+                            rxPacket = new UDSPacket(payload, txMode);
+                            ;
                         }
-                        else if (rxMsgBytes[i] != (byte)OBDcmd.Response.NEGATIVE_RESPONSE)
-                        {
-                            //This is an invalid response, give up now
-                            return false;
-                        }
-                        stateMachine = 3;
-                        break;
+                        return rxPacket;
                     case 3:
-                        if (i + 1 <= rxMsgBytes.Length - 1)
-                        {
-                            functionResponse = (UDScmd.Response)rxMsgBytes[i + 1];
-                        } 
+                    default:
+                        return rxPacket;
+                }
+            }
+            return rxPacket;
+        }
 
-                        //27 01 should respond with either 27 01 xx xx xx 0r 27 02 
-                        //if (positiveReponse && rxMsgBytes[i] == txSubFunction)
-                        if (positiveReponse)
-                        {
+        public class UDSPacket
+        {
+            public UDScmd.Response Response = UDScmd.Response.NO_RESPONSE;
+            public UDScmd.NegativeResponse NegativeResponse = UDScmd.NegativeResponse.UNKNOWN;
+            public UDScmd.Mode Mode = UDScmd.Mode.UNKNOWN;
+            public byte SubFunction = 0;
+            public byte[] Payload = new byte[0];
 
-                            //We have a positive response and a positive subfunction code (subfunction is reflected)
-                            int payloadLength = rxMsgBytes.Length - (i+ payloadOffset);
-                            if (payloadLength > 0)
-                            {
-                                payload = new byte[payloadLength];
-                                Array.Copy(rxMsgBytes, i+payloadOffset, payload, 0, payloadLength);
-                            }
-                            return true;
+            public UDSPacket()
+            {
+
+            }
+
+            public UDSPacket(byte [] data, UDScmd.Mode mode)
+            {
+                if (data == null) return;
+                if (data.Length < 1) return;
+                if((UDScmd.Response)data[0] != UDScmd.Response.NEGATIVE_RESPONSE) Response = (UDScmd.Response)(data[0] - (byte)mode);
+                else Response =  UDScmd.Response.NEGATIVE_RESPONSE;
+                if (data.Length < 2) return;
+                Mode = (UDScmd.Mode)data[1];
+                int payloadLength = 0;
+
+                switch (mode)
+                {
+                    case UDScmd.Mode.READ_MEMORY_BY_ADDRESS:
+                    case UDScmd.Mode.REQUEST_DOWNLOAD:
+                        if (Response == UDScmd.Response.NEGATIVE_RESPONSE)
+                        {
+                            NegativeResponse = (UDScmd.NegativeResponse)data[2];
+                            return;
+                        }
+                        payloadLength = data.Length - 1;
+                        if (payloadLength < 1) return;
+                        Payload = new byte[payloadLength];
+                        Buffer.BlockCopy(data, 1, Payload, 0, payloadLength);
+                        break;
+                    case UDScmd.Mode.SECURITY_ACCESS:
+                        int offset;
+                        if (Response == UDScmd.Response.NEGATIVE_RESPONSE)
+                        {
+                            offset = 3;
+                            if (data.Length < 3) return;
+                            NegativeResponse = (UDScmd.NegativeResponse)data[2];
                         }
                         else
                         {
-                            //We had a positive response but a negative subfunction error
-                            //we return the function error code so it can be relayed
-                            return false;
+                            offset = 2;
+                            SubFunction = data[1];
                         }
+                        payloadLength = data.Length - offset;
+                        if (payloadLength < 1) return;
+                        Payload = new byte[payloadLength];
+                        Buffer.BlockCopy(data, offset, Payload, 0, payloadLength);
+                        break;
                     default:
-                        return false;
+                        break;
                 }
             }
-            return false;
         }
 
         private static readonly Dictionary<int, byte[]> SecretKeysLevel1 = new Dictionary<int, byte[]>
@@ -488,9 +522,17 @@ namespace OBD
             TESTER_PRESENT = 0X3E,
             CONTROL_DTC_SETTING = 0X85,
             DIAGNOSTIC_COMMAND = 0xB1,
+            UNKNOWN = 0xFF,
         }
 
         public enum Response : byte
+        {
+            NO_RESPONSE = 0,
+            POSTIVE_RESONSE = 0x40,
+            NEGATIVE_RESPONSE = 0x7F
+        }
+
+        public enum NegativeResponse : byte
         {
             POSITIVE_RESPONSE = 0X00,
             GENERAL_REJECT = 0X10,

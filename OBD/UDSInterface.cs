@@ -10,13 +10,13 @@ namespace OBD
         //void ReadMemoryByAddress( address, out byte[] memory);
         void SecurityAccess(byte mode);
 
-        bool ECUReset(byte[] command);
+        void ECUReset(byte[] command);
 
-        bool ClearDiagnosticInformation(byte[] command);
+        void ClearDiagnosticInformation(byte[] command);
+        
+        void RequestDownload();
 
-        bool RequestDownload();
-
-        bool RequestUpload();
+        void RequestUpload();
 
         //DIAGNOSTIC_SESSION_CONTROL = 0x10,
         //    ECU_RESET = 0x11,
