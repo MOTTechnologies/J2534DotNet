@@ -104,21 +104,145 @@ namespace OBD
         }
 
         //This is used to erase the flash
-        public void EraseFlash()
+        public void EraseFlash(BackgroundWorker progressReporter = null)
         {
             //Non Standard Manafacturer Specific Mode EraseFlash (Ford Spanish Oak)
             //byte1 ServiceID 0xB1
             //byte2 AddressAndLengthFormatIdentifier (0x00 for Ford Spanish Oak)
             //byte3 0xB2 magic byte 1
             //byte4 0xAA
-            byte[] txMsgBytes = { (byte)UDScmd.Mode.DIAGNOSTIC_COMMAND, 0x00, 0xB2, 0xAA};
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.DIAGNOSTIC_COMMAND, 0x00, 0xB2, 0xAA };
             SendMessage(txMsgBytes);
 
             List<PassThruMsg> rxMsgs;
-            ReadAllMessages(out rxMsgs, 1, 1000, true);
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+            }
 
             //Expect back 0x7F B1 78  (78=Response Pending)
             //0xF1 00 B2  which is success
+
+            //If we couldn't find the start of the mesage give up
+            if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.DIAGNOSTIC_COMMAND);
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE)
+            {
+                //We expect a negative response but with response pending
+                if (rxPacket.NegativeResponse != UDScmd.NegativeResponse.REPONSE_PENDING)
+                {
+                    throw new UDSException(rxPacket.NegativeResponse);
+                }
+
+                //Wait for the PCM to erase the flash
+                ReadMessage(out rxMsgs, 15000);
+
+                //If we couldn't find the start of the mesage give up
+                if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+                if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+                rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.DIAGNOSTIC_COMMAND);
+                if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE) throw new UDSException(rxPacket.NegativeResponse);
+            }
+
+            if (rxPacket.Payload.Length < 2) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            //There is no IS14229 spec for this command so we manually check it
+            if (rxPacket.Payload[0] != 0x00 || rxPacket.Payload[1] != 0xB2) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+        }
+
+        public void WriteFlash(byte [] data, BackgroundWorker progressReporter = null)
+        {
+            if (data.Length < 100000) return;
+            int i;
+            var blocksize = 0x400;
+            for (i = 0x10000; i <= 0xFFC00; i += blocksize)
+            {
+                TransferData(data, i, blocksize);
+                
+                if (progressReporter != null) progressReporter.ReportProgress((int)((float)i / (float)0xFFC00 * 100.0f));
+            }
+        }
+
+        public void RequestTransferExit()
+        {
+
+            //ISO14229 RequestTransferExit
+            //byte1 ServiceID 0x37
+
+            byte[] txMsgBytes = {(byte)UDScmd.Mode.TRANSFER_EXIT };
+            SendMessage(txMsgBytes);
+
+            //We expect no reply
+            List<PassThruMsg> rxMsgs;
+
+            //This will throw an exception if we don't get a valid reply
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+            }
+
+            //If we couldn't find the start of the mesage give up
+            if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.TRANSFER_EXIT);
+            var b = rxMsgs[0].GetBytes();
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE)
+            {
+                //We expect a negative response but with response pending
+                if (rxPacket.NegativeResponse != UDScmd.NegativeResponse.REPONSE_PENDING) throw new UDSException(rxPacket.NegativeResponse);
+            }
+        }
+
+        public void TransferData(byte [] data, int offset, int length, int blockSize = -1)
+        {
+            //ISO14229 TransferData
+            //byte1 ServiceID 0x36
+            if (blockSize == -1) blockSize = length;
+
+            byte[] txMsgBytes = new byte[(length + 1)];
+            txMsgBytes[0] = (byte)UDScmd.Mode.TRANSFER_DATA;
+            Buffer.BlockCopy(data, offset, txMsgBytes, 1, blockSize);
+            SendMessage(txMsgBytes);
+
+
+            //We expect no reply
+            List<PassThruMsg> rxMsgs;
+            List<byte[]> msgs = new List<byte[]>();
+            //This will throw an exception if we don't get a valid reply
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+                msgs.Add(rxMsgs[0].GetBytes());
+            }
+
+            //If we couldn't find the start of the mesage give up
+            if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+            UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.TRANSFER_DATA);
+            var b = rxMsgs[0].GetBytes();
+            msgs.Add(b);
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE)
+            {
+                while(rxPacket.NegativeResponse == UDScmd.NegativeResponse.REPONSE_PENDING)
+                {
+                    ReadMessage(out rxMsgs, 250);
+                    if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+                    if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+                    rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.TRANSFER_DATA);
+                    msgs.Add(rxMsgs[0].GetBytes());
+                }
+
+                //If we get a different negative response code then this is an actual error
+                if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE)
+                {
+                    throw new UDSException(rxPacket.NegativeResponse);
+                }
+            }
         }
 
         public void RequestDownload()
@@ -136,28 +260,50 @@ namespace OBD
             //byte8 uncompressedMemorySizeByte1
             //byte9 uncompressedMemorySizeByte1
 
-            byte[] txMsgBytes = { (byte)UDScmd.Mode.REQUEST_DOWNLOAD, 0x00, 0x01, 0x00,00,00,00,0x30,00};
+            //We need to do something more clever here based upon the flash size
+            byte[] txMsgBytes = { (byte)UDScmd.Mode.REQUEST_DOWNLOAD, 0x00, 0x01, 0x00,00,00,0x0F,0x00,00};
             SendMessage(txMsgBytes);
 
             //We expect 3 messages, rx, start of message, 0x78 (response pending) then the successful response
             List<PassThruMsg> rxMsgs;
 
-            ReadAllMessages(out rxMsgs, 1, 100, true);
+            //This will throw an exception if we don't get a valid reply
+            while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+            {
+                if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+            }
 
-            //UDScmd.NegativeResponse subFunctionResponse = UDScmd.NegativeResponse.UNKNOWN;
-            //byte[] payload;
-            //bool success = false;
-            //foreach(var msg in rxMsgs)
-            //{
-            //    UDSPacket rxPacket = ParseUDSResponse(msg, UDScmd.Mode.REQUEST_DOWNLOAD);
+            //If we couldn't find the start of the mesage give up
+            if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+            if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
 
-            //        success = true;
-            //        break;
-            //    }
-            //}
+            UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.REQUEST_DOWNLOAD);
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE)
+            {
+                //We expect a negative response but with response pending
+                if (rxPacket.NegativeResponse != UDScmd.NegativeResponse.REPONSE_PENDING) throw new UDSException(rxPacket.NegativeResponse);
 
-            ////Bubble the last subFunctionError back to the user
-            //if (!success) throw new UDSException(subFunctionResponse);
+                //ReadMessage(out rxMsgs, 250);
+                List<byte[]> temp = new List<byte[]>();
+                while (ReadMessage(out rxMsgs, 250) == J2534Err.STATUS_NOERROR)
+                {
+                    var b = rxMsgs[0].GetBytes();
+                    temp.Add(b);
+                    if (rxMsgs[0].RxStatus == RxStatus.NONE) break;
+                }
+
+                //If we couldn't find the start of the mesage give up
+                if (J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
+                if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
+
+                rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.REQUEST_DOWNLOAD);
+                if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE) throw new UDSException(rxPacket.NegativeResponse);
+
+            }
+
+            //We have a positive response lets check the payload
+            //This reply from the spanish oak doesn't really seem to match the ISO14229 spec however it must be in this format so we fail if it is not
+            if (rxPacket.LengthFormatIdentifier != 0x04 || rxPacket.MaxNumberOfBlockLength != 0x01) throw new UDSException(UDScmd.NegativeResponse.UPLOAD_DOWNLOAD_NOT_ACCEPTED);
 
         }
 
@@ -188,14 +334,27 @@ namespace OBD
             }
 
             //If we couldn't find the start of the mesage give up
-            if(m_status != J2534Err.STATUS_NOERROR) throw new J2534Exception(m_status);
+            if(J2534Status != J2534Err.STATUS_NOERROR) throw new J2534Exception(J2534Status);
             if (rxMsgs.Count < 1) throw new J2534Exception(J2534Err.ERR_INVALID_MSG);
 
             UDSPacket rxPacket = ParseUDSResponse(rxMsgs[0], UDScmd.Mode.READ_MEMORY_BY_ADDRESS);
-            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESONSE) {
+            if (rxPacket.Response != UDScmd.Response.POSTIVE_RESPONSE) {
                 throw new UDSException(rxPacket.NegativeResponse);
             }
             memory = rxPacket.Payload;
+        }
+
+
+        public void Listen()
+        {
+
+            List<PassThruMsg> rxMsgs;
+            J2534Status = J2534Interface.ReadAllMessages(ChannelId, 10000, 1000, out rxMsgs, true);
+            List<byte[]> msgs = new List<byte[]>();
+            foreach(var msg in rxMsgs)
+            {
+                msgs.Add(msg.GetBytes());
+            }
         }
 
         public void SecurityAccess(byte subFunction)
@@ -419,9 +578,17 @@ namespace OBD
 
         public class UDSPacket
         {
+            //Depending on the request type some of these fields will not be used
             public UDScmd.Response Response = UDScmd.Response.NO_RESPONSE;
             public UDScmd.NegativeResponse NegativeResponse = UDScmd.NegativeResponse.UNKNOWN;
+
+            //The mode is often reflected back, if so this is populated
             public UDScmd.Mode Mode = UDScmd.Mode.UNKNOWN;
+
+
+            public byte LengthFormatIdentifier = 0;
+            public byte MaxNumberOfBlockLength = 0;
+            //Typically used by SECURITY_ACCESS
             public byte SubFunction = 0;
             public byte[] Payload = new byte[0];
 
@@ -435,24 +602,34 @@ namespace OBD
                 if (data == null) return;
                 if (data.Length < 1) return;
                 if((UDScmd.Response)data[0] != UDScmd.Response.NEGATIVE_RESPONSE) Response = (UDScmd.Response)(data[0] - (byte)mode);
-                else Response =  UDScmd.Response.NEGATIVE_RESPONSE;
+                else Response = UDScmd.Response.NEGATIVE_RESPONSE;
                 if (data.Length < 2) return;
                 Mode = (UDScmd.Mode)data[1];
                 int payloadLength = 0;
 
                 switch (mode)
                 {
+                    case UDScmd.Mode.TRANSFER_DATA:
+                    case UDScmd.Mode.DIAGNOSTIC_COMMAND:
                     case UDScmd.Mode.READ_MEMORY_BY_ADDRESS:
+                        if (Response == UDScmd.Response.NEGATIVE_RESPONSE)
+                        {
+                            NegativeResponse = (UDScmd.NegativeResponse)data[2];
+                        }
+                        payloadLength = data.Length - 1;
+                        if (payloadLength < 1) return;
+                        Payload = new byte[payloadLength];
+                        Buffer.BlockCopy(data, 1, Payload, 0, payloadLength);
+                        break;
                     case UDScmd.Mode.REQUEST_DOWNLOAD:
                         if (Response == UDScmd.Response.NEGATIVE_RESPONSE)
                         {
                             NegativeResponse = (UDScmd.NegativeResponse)data[2];
                             return;
                         }
-                        payloadLength = data.Length - 1;
-                        if (payloadLength < 1) return;
-                        Payload = new byte[payloadLength];
-                        Buffer.BlockCopy(data, 1, Payload, 0, payloadLength);
+                        if (data.Length < 3) return;
+                        LengthFormatIdentifier = data[1];
+                        MaxNumberOfBlockLength = data[2];
                         break;
                     case UDScmd.Mode.SECURITY_ACCESS:
                         int offset;
@@ -528,7 +705,7 @@ namespace OBD
         public enum Response : byte
         {
             NO_RESPONSE = 0,
-            POSTIVE_RESONSE = 0x40,
+            POSTIVE_RESPONSE = 0x40,
             NEGATIVE_RESPONSE = 0x7F
         }
 
@@ -553,6 +730,7 @@ namespace OBD
             GENERAL_PROGRAMMING_FAILURE = 0X72,
             WRONG_BLOCK_SEQUENCE_COUNTER = 0X73,
             REPONSE_PENDING = 0X78,
+            INVALID_DATA_BLOCK = 0X79,      //This appears to be a Ford "invalid data block"
             SUBFUNCTION_NOT_SUPPORTED_IN_ACTIVE_SESSION = 0X7E,
             SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION = 0X7F,
             RPM_TOO_HIGH = 0X81,

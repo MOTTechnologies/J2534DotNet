@@ -52,7 +52,7 @@ namespace J2534DotNet
 
             Marshal.StructureToPtr(sConfigList, input, false);
 
-            var err = (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.GET_CONFIG, input, output);
+            var err = (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.GET_CONFIG, input, output);
 
             var configList = input.AsStruct<SConfigList>().GetList();
 
@@ -73,7 +73,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.SET_CONFIG, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.SET_CONFIG, input, output);
         }
 
         public J2534Err ReadBatteryVoltage(int deviceId, ref int voltage)
@@ -81,7 +81,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = Marshal.AllocHGlobal(8);
 
-            J2534Err returnValue = (J2534Err)m_wrapper.Ioctl(deviceId, (int)Ioctl.READ_VBATT, input, output);
+            J2534Err returnValue = (J2534Err)_wrapper.Ioctl(deviceId, (int)Ioctl.READ_VBATT, input, output);
             if (returnValue == J2534Err.STATUS_NOERROR)
             {
                 voltage = Marshal.ReadInt32(output);
@@ -97,7 +97,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = Marshal.AllocHGlobal(8);
 
-            voltage = (int)m_wrapper.Ioctl(deviceId, (int)Ioctl.READ_PROG_VOLTAGE, input, output);
+            voltage = (int)_wrapper.Ioctl(deviceId, (int)Ioctl.READ_PROG_VOLTAGE, input, output);
             //if (returnValue == J2534Err.STATUS_NOERROR)
             //{
             //}
@@ -124,7 +124,7 @@ namespace J2534DotNet
                 Marshal.StructureToPtr(inputArray, input, true);
                 Marshal.StructureToPtr(outputArray, output, true);
 
-                returnValue = (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.FIVE_BAUD_INIT, input, output);
+                returnValue = (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.FIVE_BAUD_INIT, input, output);
 
                 Marshal.PtrToStructure(output, outputArray);
             }
@@ -140,7 +140,7 @@ namespace J2534DotNet
             Marshal.StructureToPtr(txMsg, input, true);
             Marshal.StructureToPtr(uRxMsg, output, true);
 
-            J2534Err returnValue = (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.FAST_INIT, input, output);
+            J2534Err returnValue = (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.FAST_INIT, input, output);
             if (returnValue == J2534Err.STATUS_NOERROR)
             {
                 Marshal.PtrToStructure(output, rxMsg);
@@ -154,7 +154,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_TX_BUFFER, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_TX_BUFFER, input, output);
         }
 
         public J2534Err ClearRxBuffer(int channelId)
@@ -162,7 +162,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_RX_BUFFER, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_RX_BUFFER, input, output);
         }
 
         public J2534Err ClearPeriodicMsgs(int channelId)
@@ -170,7 +170,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_PERIODIC_MSGS, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_PERIODIC_MSGS, input, output);
         }
 
         public J2534Err ClearMsgFilters(int channelId)
@@ -178,7 +178,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_MSG_FILTERS, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_MSG_FILTERS, input, output);
         }
 
         public J2534Err ClearFunctMsgLookupTable(int channelId)
@@ -186,7 +186,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
 
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_FUNCT_MSG_LOOKUP_TABLE, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.CLEAR_FUNCT_MSG_LOOKUP_TABLE, input, output);
         }
 
         public J2534Err AddToFunctMsgLookupTable(int channelId)
@@ -194,7 +194,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
             // TODO: fix this
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.ADD_TO_FUNCT_MSG_LOOKUP_TABLE, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.ADD_TO_FUNCT_MSG_LOOKUP_TABLE, input, output);
         }
 
         public J2534Err DeleteFromFunctMsgLookupTable(int channelId)
@@ -202,7 +202,7 @@ namespace J2534DotNet
             IntPtr input = IntPtr.Zero;
             IntPtr output = IntPtr.Zero;
             // TODO: fix this
-            return (J2534Err)m_wrapper.Ioctl(channelId, (int)Ioctl.DELETE_FROM_FUNCT_MSG_LOOKUP_TABLE, input, output);
+            return (J2534Err)_wrapper.Ioctl(channelId, (int)Ioctl.DELETE_FROM_FUNCT_MSG_LOOKUP_TABLE, input, output);
         }
 
         /// <summary>
@@ -254,7 +254,6 @@ namespace J2534DotNet
 
             return J2534Err.STATUS_NOERROR;
         }
-
 
     }
 

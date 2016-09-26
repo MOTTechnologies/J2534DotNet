@@ -29,6 +29,8 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -48,8 +50,13 @@ namespace Sample
             InitializeComponent();
             mainLabel.Text = titleText;
         }
+
+        public void UpdateText(string text)
+        {
+            mainLabel.Text = text;
+        }
         
-        public void StartScroll(bool percentage = false)
+        public void StartScroll()
         {
              progressBar.Style = ProgressBarStyle.Marquee;
         }
@@ -79,5 +86,7 @@ namespace Sample
         {
             //this.Owner.Enabled = true;
         }
+
+
     }
 }

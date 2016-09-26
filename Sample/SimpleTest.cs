@@ -34,21 +34,25 @@ using OBD;
 namespace Sample
 {
     using J2534DotNet.Logger;
+    using Plugins;
     using System.ComponentModel;
     using System.Diagnostics;
     using System.IO;
+    using System.Linq.Expressions;
     using System.Runtime.InteropServices;
     using System.Threading;
 
     public partial class SimpleTest : Form
     {
-        bool connected = false;
-        J2534Extended passThru;
-        UDSFord comm;
+        FileFormatPluginLoader _pluginLoader;
+        J2534Extended _passThru;
+        UDSFord _comm;
+        byte[] _rawBinaryFile;
         public SimpleTest()
         {
             InitializeComponent();
-            passThru = new J2534Extended();
+            _passThru = new J2534Extended();
+            _pluginLoader = new FileFormatPluginLoader(Directory.GetCurrentDirectory() + @"\Plugins");
         }
 
 
@@ -93,9 +97,9 @@ namespace Sample
                     return;
                 }
 
-                if (!comm.GetBatteryVoltage(ref voltage))
+                if (!_comm.GetBatteryVoltage(ref voltage))
                 {
-                    MessageBox.Show(String.Format("Error reading voltage.  Error: {0}", comm.GetLastError()), "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+                    MessageBox.Show(String.Format("Error reading voltage.  Error: {0}", _comm.GetLastError()), "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                 }
             }
             catch (OBDException obdEx)
@@ -130,7 +134,7 @@ namespace Sample
             {
                 if (!Connect()) return;
 
-                vin = comm.GetVin();
+                vin = _comm.GetVin();
 
             }
             catch (OBDException obdEx)
@@ -170,8 +174,8 @@ namespace Sample
                     
                     return false;
                 }
-                comm = new UDSFord(passThru);
-                comm.ConnectISO15765();
+                _comm = new UDSFord(_passThru);
+                _comm.ConnectISO15765();
                 return true;
             }
             catch (J2534Exception ex)
@@ -199,8 +203,8 @@ namespace Sample
 
         bool LoadJ2534()
         {
-            if(passThru == null) passThru = new J2534Extended();
-            if (passThru.IsLoaded) return true;
+            if(_passThru == null) _passThru = new J2534Extended();
+            if (_passThru.IsLoaded) return true;
             J2534Device j2534Device;
 
             // Find all of the installed J2534 passthru devices
@@ -208,7 +212,7 @@ namespace Sample
             if (availableJ2534Devices.Count == 0)
             {
                 MessageBox.Show("Could not find any installed J2534 devices in the Windows registry, have you installed the device drivers for your cable?");
-                passThru.FreeLibrary();
+                _passThru.FreeLibrary();
                 return false;
             }
 
@@ -219,17 +223,17 @@ namespace Sample
                     if (Path.GetFileName(lib.FunctionLibrary).Contains("J2534DotNet.Logger.dll")) continue;
                     try {
                         j2534Device = new J2534Device();
-                        if (!passThru.LoadLibrary(lib))
+                        if (!_passThru.LoadLibrary(lib))
                         {
                             j2534Device = null;
                             continue;
                         }
 
-                        comm = new UDSFord(passThru);
-                        comm.Connect();
+                        _comm = new UDSFord(_passThru);
+                        _comm.Connect();
 
                         //if we get this far then we have successfully connected
-                        comm.Disconnect();
+                        _comm.Disconnect();
                         return true;
                         
                     } catch {
@@ -238,7 +242,7 @@ namespace Sample
                     }
 
                 }
-                passThru.FreeLibrary();
+                _passThru.FreeLibrary();
                 return false;
 
             }
@@ -248,15 +252,15 @@ namespace Sample
                 j2534Device = new J2534Device();
                 j2534Device.FunctionLibrary = System.IO.Directory.GetCurrentDirectory() + "\\" + "J2534DotNet.Logger.dll";
                 Thread.Sleep(10);
-                var loaded = passThru.LoadLibrary(j2534Device);
-                if(!loaded) passThru.FreeLibrary();
+                var loaded = _passThru.LoadLibrary(j2534Device);
+                if(!loaded) _passThru.FreeLibrary();
                 return loaded;
             }
 
             //If there is only one DLL to choose from then load it
             if (availableJ2534Devices.Count == 1)
             {
-                return passThru.LoadLibrary(availableJ2534Devices[0]);
+                return _passThru.LoadLibrary(availableJ2534Devices[0]);
             }
             else
             {
@@ -264,8 +268,8 @@ namespace Sample
                 if (sd.ShowDialog() == DialogResult.OK)
                 {
                     j2534Device = sd.Device;
-                    var loaded = passThru.LoadLibrary(j2534Device);
-                    if (!loaded) passThru.FreeLibrary();
+                    var loaded = _passThru.LoadLibrary(j2534Device);
+                    if (!loaded) _passThru.FreeLibrary();
                     return loaded;
                 }
             }
@@ -275,9 +279,7 @@ namespace Sample
 
         void Disconnect()
         {
-            if(comm != null) comm.Disconnect();
-            //if(passThru != null) passThru.FreeLibrary();
-
+            if(_comm != null) _comm.Disconnect();
         }
 
         void UpdateLog(string text)
@@ -305,7 +307,6 @@ namespace Sample
 
             progressForm.Owner = (Form)this.Parent;
             progressForm.StartPosition = FormStartPosition.CenterScreen;
-            progressForm.Show();
 
             backgroundWorker.RunWorkerAsync();
         }
@@ -348,11 +349,11 @@ namespace Sample
                     voltLow = 100000;
                 }
                 //Ensure the programming voltage is 0v as the PCM needs to see a transition from 0 -> 18v
-                float voltage = comm.ReadProgrammingVoltage();
+                float voltage = _comm.ReadProgrammingVoltage();
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage > voltLow)
                 {
-                    voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
+                    voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
 
                     backgroundWorker.ReportProgress(0, "SetProgrammingVoltage VOLTAGE_OFF");
                     backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
@@ -363,7 +364,7 @@ namespace Sample
                     }
                 }
 
-                voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.FEPS_VOLTAGE);
+                voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.FEPS_VOLTAGE);
                 backgroundWorker.ReportProgress(0, "SetProgrammingVoltage 18000 mV");
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage < voltHigh)
@@ -374,7 +375,7 @@ namespace Sample
                 MessageBox.Show("Please turn the ignition off, wait 3 seconds, then turn it back on before pressing OK.");
 
                 //Ensure the programming voltage is still high after an ignition cycle
-                voltage = comm.ReadProgrammingVoltage();
+                voltage = _comm.ReadProgrammingVoltage();
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage < voltHigh)
                 {
@@ -384,18 +385,21 @@ namespace Sample
 
 
                 //Enter level 1 seecurity mode
-                comm.SecurityAccess(0x01);
+                _comm.SecurityAccess(0x01);
                 backgroundWorker.ReportProgress(0, "Unlocked Controller");
 
+                this.Invoke((MethodInvoker)delegate {
+                    progressForm.Show();
+                });
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
-                flashMemory = comm.ReadFlashMemory(backgroundWorker);
+                flashMemory = _comm.ReadFlashMemory(backgroundWorker);
                 stopwatch.Stop();
                 var timeTaken = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds);
 
                 backgroundWorker.ReportProgress(0, $"Successfully read {flashMemory.Length} bytes of flash memory in {timeTaken.Minutes}:{timeTaken.Seconds}");
 
-                voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
+                voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
                 backgroundWorker.ReportProgress(0, "SetProgrammingVoltage DISCONNECT");
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
             }
@@ -458,9 +462,44 @@ namespace Sample
              
         }
 
+
+        bool OpenFile()
+        {
+            _rawBinaryFile = new byte[0];
+            var openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = _pluginLoader.GetAllFormatsFilter();
+            DialogResult result = openFileDialog.ShowDialog();
+            if (result != DialogResult.OK) return false;
+            var fileName = openFileDialog.FileName;
+
+            string extension = Path.GetExtension(fileName).ToLowerInvariant().Replace(".", "");
+            if (!File.Exists(fileName))
+            {
+                MessageBox.Show("File does not exist: " + fileName, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            Plugins.FileFormat fileFormatPlugin;
+
+            if (_pluginLoader.TryGetFileFormat(extension, out fileFormatPlugin))
+            {
+                if (fileFormatPlugin.Open(fileName))
+                {
+                    if (fileFormatPlugin.TryReadBytes(out _rawBinaryFile))
+                    {
+                        if (_rawBinaryFile.Length > 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            MessageBox.Show("Invalid file!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
+        }
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-
             Disconnect();
         }
 
@@ -482,12 +521,12 @@ namespace Sample
                 if (!Connect()) return;
                 UpdateLog("Connected");
 
-                if (comm == null) comm = new UDSFord(passThru);
+                if (_comm == null) _comm = new UDSFord(_passThru);
 
                 if (off)
                 {
                     UpdateLog("setProgrammingVoltage(PinNumber.PIN_13, OFF)");
-                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
+                    float programmingVoltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
                     UpdateLog("Voltage = : " + programmingVoltage);
                     _toggle = false;
                 }
@@ -497,7 +536,7 @@ namespace Sample
                     if (!UInt32.TryParse(textBoxVolts.Text, out mvolts)) return;
 
                     UpdateLog("setProgrammingVoltage(PinNumber.PIN_13 " + mvolts + " mV");
-                    float programmingVoltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, (PinVoltage)mvolts);
+                    float programmingVoltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, (PinVoltage)mvolts);
                     UpdateLog("Voltage = " + programmingVoltage + "V");
                     _toggle = true;
                 }
@@ -530,31 +569,36 @@ namespace Sample
         {
             SetVoltage(true);
         }
-        private void RequestDownload_Click(object sender, EventArgs e)
+        private void WriteFlash_Click(object sender, EventArgs e)
         {
+
+            if (!OpenFile()) return;
+
             this.Enabled = false;
 
-            progressForm = new ProgressForm("Writing PCM flash...");
+            progressForm = new ProgressForm("Erasing PCM flash...");
 
             backgroundWorker = new BackgroundWorker();
 
             backgroundWorker.WorkerReportsProgress = true;
 
-            backgroundWorker.DoWork += new DoWorkEventHandler(RequestDownload);
+            backgroundWorker.DoWork += new DoWorkEventHandler(WriteFlash);
             backgroundWorker.ProgressChanged += new ProgressChangedEventHandler(UpdateFlashReadProgress);
             backgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(FlashReadFinished);
 
             progressForm.Owner = (Form)this.Parent;
             progressForm.StartPosition = FormStartPosition.CenterScreen;
-            progressForm.Show();
 
             backgroundWorker.RunWorkerAsync();
         }
 
-        private void RequestDownload(object sender, DoWorkEventArgs e)
+
+
+        private void WriteFlash(object sender, DoWorkEventArgs e)
         {
             try
             {
+
                 if (!Connect())
                 {
                     MessageBox.Show("Failed to connect to a J2534 device", "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
@@ -571,11 +615,11 @@ namespace Sample
                     voltLow = 100000;
                 }
                 //Ensure the programming voltage is 0v as the PCM needs to see a transition from 0 -> 18v
-                float voltage = comm.ReadProgrammingVoltage();
+                float voltage = _comm.ReadProgrammingVoltage();
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage > voltLow)
                 {
-                    voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
+                    voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
 
                     backgroundWorker.ReportProgress(0, "SetProgrammingVoltage VOLTAGE_OFF");
                     backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
@@ -586,7 +630,7 @@ namespace Sample
                     }
                 }
 
-                voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.FEPS_VOLTAGE);
+                voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.FEPS_VOLTAGE);
                 backgroundWorker.ReportProgress(0, "SetProgrammingVoltage 18000 mV");
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage < voltHigh)
@@ -597,7 +641,7 @@ namespace Sample
                 MessageBox.Show("Please turn the ignition off, wait 3 seconds, then turn it back on before pressing OK.");
 
                 //Ensure the programming voltage is still high after an ignition cycle
-                voltage = comm.ReadProgrammingVoltage();
+                voltage = _comm.ReadProgrammingVoltage();
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
                 if (voltage < voltHigh)
                 {
@@ -605,24 +649,36 @@ namespace Sample
                     return;
                 }
 
-
                 //Enter level 1 seecurity mode
-                comm.SecurityAccess(0x01);
+                _comm.SecurityAccess(0x01);
                 backgroundWorker.ReportProgress(0, "Unlocked Controller");
+
+                this.Invoke((MethodInvoker)delegate {
+                    progressForm.Show();
+                    progressForm.UpdateText("Erasing flash...");
+                    progressForm.StartScroll();
+                });
+                _comm.EraseFlash();
+
+                this.Invoke((MethodInvoker)delegate {
+                    progressForm.Show();
+                    progressForm.UpdateText("Writing flash...");
+                    progressForm.StopScroll();
+                });
+                _comm.RequestDownload();
 
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
 
-
-                comm.RequestDownload();
-
+                _comm.WriteFlash(_rawBinaryFile, backgroundWorker);
 
                 stopwatch.Stop();
                 var timeTaken = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds);
 
-                backgroundWorker.ReportProgress(0, $"Successfully wrote ???? bytes of flash memory in {timeTaken.Minutes}:{timeTaken.Seconds}");
+                backgroundWorker.ReportProgress(0, $"Successfully wrote {0x3400 + 0x296A + 0x1800} bytes of flash memory in {timeTaken.Minutes}:{timeTaken.Seconds}");
+                _comm.RequestTransferExit();
 
-                voltage = comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
+                voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);
                 backgroundWorker.ReportProgress(0, "SetProgrammingVoltage DISCONNECT");
                 backgroundWorker.ReportProgress(0, "ReadProgrammingVoltage = " + voltage + " mV");
             }
@@ -651,12 +707,23 @@ namespace Sample
         private void ChangeDevice_Click(object sender, EventArgs e)
         {
             Disconnect();
-            if (passThru != null)
+            if (_passThru != null)
             {
-                passThru.FreeLibrary();
+                _passThru.FreeLibrary();
             }
-            passThru = null;
-            comm = null;
+            _passThru = null;
+            _comm = null;
+        }
+
+        private void button7_Click(object sender, EventArgs e)
+        {
+            if (!Connect())
+            {
+                MessageBox.Show("Failed to connect to a J2534 device", "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+                return;
+            }
+
+            _comm.Listen();
         }
     }
 }

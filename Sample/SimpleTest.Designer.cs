@@ -44,6 +44,7 @@
             this.ignoreProrgammingVoltageCheckBox = new System.Windows.Forms.CheckBox();
             this.autoDetectCheckBox = new System.Windows.Forms.CheckBox();
             this.button6 = new System.Windows.Forms.Button();
+            this.button7 = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // cmdDetectDevices
@@ -135,9 +136,9 @@
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(155, 23);
             this.button3.TabIndex = 9;
-            this.button3.Text = "Request Download";
+            this.button3.Text = "Write Flash";
             this.button3.UseVisualStyleBackColor = true;
-            this.button3.Click += new System.EventHandler(this.RequestDownload_Click);
+            this.button3.Click += new System.EventHandler(this.WriteFlash_Click);
             // 
             // button4
             // 
@@ -199,11 +200,22 @@
             this.button6.UseVisualStyleBackColor = true;
             this.button6.Click += new System.EventHandler(this.ChangeDevice_Click);
             // 
+            // button7
+            // 
+            this.button7.Location = new System.Drawing.Point(809, 190);
+            this.button7.Name = "button7";
+            this.button7.Size = new System.Drawing.Size(155, 23);
+            this.button7.TabIndex = 16;
+            this.button7.Text = "Get All Messages";
+            this.button7.UseVisualStyleBackColor = true;
+            this.button7.Click += new System.EventHandler(this.button7_Click);
+            // 
             // SimpleTest
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(976, 433);
+            this.Controls.Add(this.button7);
             this.Controls.Add(this.button6);
             this.Controls.Add(this.autoDetectCheckBox);
             this.Controls.Add(this.ignoreProrgammingVoltageCheckBox);
@@ -246,6 +258,7 @@
         private System.Windows.Forms.CheckBox ignoreProrgammingVoltageCheckBox;
         private System.Windows.Forms.CheckBox autoDetectCheckBox;
         private System.Windows.Forms.Button button6;
+        private System.Windows.Forms.Button button7;
     }
 }
 
