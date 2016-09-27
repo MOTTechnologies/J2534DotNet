@@ -45,10 +45,15 @@ namespace Sample
             progressBar.Value = percentage;
         }
 
+        public ProgressForm()
+        {
+            InitializeComponent();
+        }
+
         public ProgressForm(string titleText)
         {
             InitializeComponent();
-            mainLabel.Text = titleText;
+            UpdateText(titleText);
         }
 
         public void UpdateText(string text)

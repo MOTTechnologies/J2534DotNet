@@ -52,7 +52,7 @@ namespace Sample
         {
             InitializeComponent();
             _passThru = new J2534Extended();
-            _pluginLoader = new FileFormatPluginLoader(Directory.GetCurrentDirectory() + @"\Plugins");
+            _pluginLoader = new FileFormatPluginLoader(Directory.GetCurrentDirectory());
         }
 
 
@@ -311,6 +311,12 @@ namespace Sample
             backgroundWorker.RunWorkerAsync();
         }
 
+        private void FlashWriteFinished(object sender, RunWorkerCompletedEventArgs e)
+        {
+            progressForm.Close();
+            this.Enabled = true;
+        }
+
         private void FlashReadFinished(object sender, RunWorkerCompletedEventArgs e)
         {
             progressForm.Close();
@@ -487,14 +493,21 @@ namespace Sample
                 {
                     if (fileFormatPlugin.TryReadBytes(out _rawBinaryFile))
                     {
-                        if (_rawBinaryFile.Length > 0)
+                        if (_rawBinaryFile.Length == 1048576)
                         {
                             return true;
+                        } else
+                        {
+                            MessageBox.Show($"Invalid file size, expected {1048576} bytes but the file was {_rawBinaryFile.Length } bytes", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
                 }
+                MessageBox.Show("Invalid file!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            } else
+            {
+                MessageBox.Show("Could not find a plugin to load this type of file!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            MessageBox.Show("Invalid file!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
             return false;
         }
 
@@ -574,9 +587,23 @@ namespace Sample
 
             if (!OpenFile()) return;
 
+            var result = MessageBox.Show("This will write a BF/FG Spanish Oak Binary to your PCM." + Environment.NewLine + Environment.NewLine +
+            "This application is a private ALPHA and is not to be used commercially!" + Environment.NewLine + Environment.NewLine +
+            "The binary is not parsed or verified and hence there is a real possibility of the PCM not working afterwards, if you require verification please wait until the public BETA release." + Environment.NewLine + Environment.NewLine +
+            "Ensure you have a verified backup of your flash and another method to reflash the PCM if required!" + Environment.NewLine + Environment.NewLine +
+            "It is highly recommended to NOT flash a vehicle that you require to drive afterwards!", "Are you sure you want to continue?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (!Connect())
+            {
+                MessageBox.Show("Failed to connect to a J2534 device", "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+                return;
+            }
+
+            if (result != DialogResult.Yes) return;
+
             this.Enabled = false;
 
-            progressForm = new ProgressForm("Erasing PCM flash...");
+            progressForm = new ProgressForm("");
 
             backgroundWorker = new BackgroundWorker();
 
@@ -584,7 +611,9 @@ namespace Sample
 
             backgroundWorker.DoWork += new DoWorkEventHandler(WriteFlash);
             backgroundWorker.ProgressChanged += new ProgressChangedEventHandler(UpdateFlashReadProgress);
-            backgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(FlashReadFinished);
+
+
+            backgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(FlashWriteFinished);
 
             progressForm.Owner = (Form)this.Parent;
             progressForm.StartPosition = FormStartPosition.CenterScreen;
@@ -599,11 +628,7 @@ namespace Sample
             try
             {
 
-                if (!Connect())
-                {
-                    MessageBox.Show("Failed to connect to a J2534 device", "Error", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
-                    return;
-                }
+
                 backgroundWorker.ReportProgress(0, "Connected");
 
                 float voltHigh = 15000;
@@ -661,7 +686,6 @@ namespace Sample
                 _comm.EraseFlash();
 
                 this.Invoke((MethodInvoker)delegate {
-                    progressForm.Show();
                     progressForm.UpdateText("Writing flash...");
                     progressForm.StopScroll();
                 });
@@ -675,7 +699,7 @@ namespace Sample
                 stopwatch.Stop();
                 var timeTaken = TimeSpan.FromMilliseconds(stopwatch.ElapsedMilliseconds);
 
-                backgroundWorker.ReportProgress(0, $"Successfully wrote {0x3400 + 0x296A + 0x1800} bytes of flash memory in {timeTaken.Minutes}:{timeTaken.Seconds}");
+                backgroundWorker.ReportProgress(0, $"Successfully wrote {_rawBinaryFile.Length-0x10000} bytes of flash memory in {timeTaken.Minutes}:{timeTaken.Seconds}");
                 _comm.RequestTransferExit();
 
                 voltage = _comm.PassThruSetProgrammingVoltage(PinNumber.PIN_13, PinVoltage.VOLTAGE_OFF);

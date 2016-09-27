@@ -6,7 +6,7 @@ using System.Text;
 
 namespace J2534DotNet.Logger
 {
-    class FormattedStreamWriter: StreamWriter
+    public class FormattedStreamWriter: StreamWriter
     {
         private readonly IFormatProvider formatProvider = new NullFormat();
 
