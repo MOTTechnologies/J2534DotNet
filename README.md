@@ -1,5 +1,5 @@
 # J2534DotNet
-J2534 .NET Library written by Roland Harrison (roland.c.harrison@gmail.com) using a modified J2534 libray
+J2534 .NET Library written by Roland Harrison (roland.c.harrison@gmail.com) using a heavily modified J2534 libray
 that was originally forked from mkelly/kuzkok
 
 This library is available to be forked or used as is third party projects providing I am contacted for permission.
