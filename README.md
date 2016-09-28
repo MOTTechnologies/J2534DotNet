@@ -6,8 +6,10 @@ This library is available to be forked or used as is third party projects provid
 
 The ALPHA sample application is exactly that, an ALPHA. It must not be used to program cars that are driven on the street. 
 
-It currently will read and write the flash from BF/FG Australian Falcons with NO ERROR CHECKING
+It currently will read and write the flash from BF/FG Australian Falcons with NO ERROR CHECKING. 
+If you use this program there is absolutely no support or warranty and it must be done so at your own risk.
 
-If you attempt to write the flash to another vehicle it will BRICK THE PCM
+If you attempt to write the flash to a vehicle other than a BA/BF and it succeeds it will BRICK THE PCM
 
-This is a proof of concept only and will not be further developed.
+The J2534/OBD/UDS library will continue to remain public and be updated. 
+The sample program is a proof of concept only and will not be further developed.
