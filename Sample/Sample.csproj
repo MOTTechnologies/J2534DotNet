@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -10,12 +10,13 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Sample</RootNamespace>
     <AssemblyName>Sample</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <OldToolsVersion>3.5</OldToolsVersion>
     <UpgradeBackupLocation />
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -26,6 +27,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -35,6 +37,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -45,6 +48,7 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
     <OutputPath>bin\x86\Release\</OutputPath>
@@ -54,6 +58,7 @@
     <PlatformTarget>x86</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
@@ -99,13 +104,9 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\FordECU\PCMEditor\DataAnalyser\Plugin.FileFormat.PHF\Plugin.FileFormat.PHF.csproj">
-      <Project>{f7de14a9-621a-4a44-b07f-17517179cf12}</Project>
-      <Name>Plugin.FileFormat.PHF</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\..\FordECU\PCMEditor\DataAnalyser\Plugin.FileFormat\Plugins.csproj">
-      <Project>{5ad0b6d0-e911-4d67-b260-1e422ec9db3d}</Project>
-      <Name>Plugins</Name>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{207b0a2f-70dc-4682-ad92-83b42b45aa9d}</Project>
+      <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\J2534DotNet.Logger\J2534DotNet.Logger.csproj">
       <Project>{3b62cc0a-cf3d-491f-9174-b60c5a8070d4}</Project>
@@ -119,9 +120,20 @@
       <Project>{d53872bf-bfbc-4d41-b6d8-b36e9c2e286a}</Project>
       <Name>OBD</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Plugin.FileFormat.PHF\Plugin.FileFormat.PHF.csproj">
+      <Project>{f7de14a9-621a-4a44-b07f-17517179cf12}</Project>
+      <Name>Plugin.FileFormat.PHF</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Plugin.FileFormat\PluginManager.csproj">
+      <Project>{5ad0b6d0-e911-4d67-b260-1e422ec9db3d}</Project>
+      <Name>PluginManager</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -30,17 +30,18 @@ using System.Windows.Forms;
 using System.Threading;
 using J2534DotNet;
 using OBD;
+using J2534DotNet.Logger;
+using Plugins;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq.Expressions;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Sample
 {
-    using J2534DotNet.Logger;
-    using Plugins;
-    using System.ComponentModel;
-    using System.Diagnostics;
-    using System.IO;
-    using System.Linq.Expressions;
-    using System.Runtime.InteropServices;
-    using System.Threading;
+
 
     public partial class SimpleTest : Form
     {
